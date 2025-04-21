@@ -24,11 +24,6 @@
 #include "alignment_cmdline.h"
 #include "alignment_scoring_load.h"
 
-// File loading
-int file_list_length = 0;
-int file_list_capacity = 0;
-char **file_paths1 = NULL, **file_paths2 = NULL;
-
 char parse_entire_int(char *str, int *result)
 {
   size_t len = strlen(str);
@@ -275,19 +270,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
                                   scoring, cmd->case_sensitive);
 
         gzclose(sub_matrix_file);
-        substitutions_set = true;
-
-        argi++; // took an argument
-      }
-      else if(strcasecmp(argv[argi], "--substitution_pairs") == 0)
-      {
-        gzFile sub_pairs_file = gzopen(argv[argi+1], "r");
-        if(sub_pairs_file == NULL) usage("Couldn't read: %s", argv[argi+1]);
-
-        align_scoring_load_pairwise(sub_pairs_file, argv[argi+1],
-                                    scoring, cmd->case_sensitive);
-
-        gzclose(sub_pairs_file);
         substitutions_set = true;
 
         argi++; // took an argument
