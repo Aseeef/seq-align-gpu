@@ -181,9 +181,6 @@ void align(const char *seq_a, const char *seq_b,
 
   fflush(stdout);
 
-  size_t hit_index = 0;
-
-
   printf("score: %i\n", aligner->max_score);
 
   fputs("==\n", stdout);

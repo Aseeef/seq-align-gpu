@@ -33,7 +33,6 @@ int main(int argc, char **argv)
   if(argc != 2) print_usage(argv);
 
   char *seq = argv[1];
-  size_t seqlen = strlen(seq);
 
   // Go
   int match = 1, mismatch = -1, gap_open = -4, gap_extend = -1;

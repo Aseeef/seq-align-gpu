@@ -168,7 +168,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
 
   // case sensitive needs to be dealt with first
   // (is is used to construct hash table for swap_scores)
-  char scoring_set = 0, substitutions_set = 0, match_set = 0, mismatch_set = 0;
+  char substitutions_set = 0, match_set = 0, mismatch_set = 0;
 
   int argi;
   for(argi = 1; argi < argc; argi++)
