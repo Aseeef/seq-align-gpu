@@ -23,16 +23,6 @@ void align(char* seq_a, char* seq_b)
   int mismatch = -2;
   int gap_open = -4;
   int gap_extend = -1;
-  
-  // Don't penalise gaps at the start
-  // ACGATTT
-  // ----TTT would score +3 (when match=+1)
-  char no_start_gap_penalty = 1;
-  
-  // ..or gaps at the end e.g.
-  // ACGATTT
-  // ACGA--- would score +4 (when match=+1)
-  char no_end_gap_penalty = 1;
 
   char no_gaps_in_a = 0, no_gaps_in_b = 0;
   char no_mismatches = 0;

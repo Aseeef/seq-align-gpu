@@ -18,7 +18,7 @@ LINK=-lalign -lstrbuf -lpthread -lz
 SRCS=$(wildcard src/*.c)
 OBJS=$(SRCS:.c=.o)
 
-all: bin/needleman_wunsch bin/smith_waterman bin/lcs src/libalign.a examples
+all: bin/smith_waterman bin/lcs src/libalign.a examples
 
 # Build libraries only if they're downloaded
 src/libalign.a: $(OBJS)
