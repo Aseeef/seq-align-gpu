@@ -106,9 +106,7 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 "    --gapopen <score>    [default: %i]\n"
 "    --gapextend <score>  [default: %i]\n"
 "\n"
-"    --scoring <PAM30|PAM70|BLOSUM80|BLOSUM62>\n"
 "    --substitution_matrix <file>  see details for formatting\n"
-"    --substitution_pairs <file>   see details for formatting\n"
 "\n"
 "    --wildcard <w> <s>   Character <w> matches all characters with score <s>\n\n",
           defaults[0], defaults[1],
@@ -125,17 +123,6 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 "\n"
 "    --context <n>        Print <n> bases of context\n"
 "    --printseq           Print sequences before local alignments\n");
-  }
-  else
-  {
-    // NW specific
-    fprintf(stderr,
-"\n"
-"    --freestartgap       No penalty for gap at start of alignment\n"
-"    --freeendgap         No penalty for gap at end of alignment\n"
-"\n"
-"    --printscores        Print optimal alignment scores\n"
-"    --zam                A funky type of output\n");
   }
 
   fprintf(stderr,
@@ -212,41 +199,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
     {
       cmd->case_sensitive = 1;
     }
-    else if(strcasecmp(argv[argi], "--scoring") == 0)
-    {
-      if(scoring_set)
-      {
-        usage("More than one scoring system specified - not permitted");
-      }
-
-      if(strcasecmp(argv[argi+1], "PAM30") == 0)
-      {
-        scoring_system_PAM30(scoring);
-      }
-      else if(strcasecmp(argv[argi+1], "PAM70") == 0)
-      {
-        scoring_system_PAM70(scoring);
-      }
-      else if(strcasecmp(argv[argi+1], "BLOSUM80") == 0)
-      {
-        scoring_system_BLOSUM80(scoring);
-      }
-      else if(strcasecmp(argv[argi+1], "BLOSUM62") == 0)
-      {
-        scoring_system_BLOSUM62(scoring);
-      }
-      else if(strcasecmp(argv[argi+1], "DNA_HYBRIDIZATION") == 0)
-      {
-        scoring_system_DNA_hybridization(scoring);
-      }
-      else {
-        usage("Unknown --scoring choice, not one of "
-              "PAM30|PAM70|BLOSUM80|BLOSUM62");
-      }
-
-      scoring_set = 1;
-      argi++; // took an argument
-    }
   }
 
   for(argi = 1; argi < argc; argi++)
@@ -254,19 +206,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
     if(argv[argi][0] == '-')
     {
       // strcasecmp does case insensitive comparison
-      if(strcasecmp(argv[argi], "--freestartgap") == 0)
-      {
-        if(cmd_type != SEQ_ALIGN_NW_CMD)
-          usage("--freestartgap only valid with Needleman-Wunsch");
-        scoring->no_start_gap_penalty = true;
-      }
-      else if(strcasecmp(argv[argi], "--freeendgap") == 0)
-      {
-        if(cmd_type != SEQ_ALIGN_NW_CMD)
-          usage("--freeendgap only valid with Needleman-Wunsch");
-        scoring->no_end_gap_penalty = true;
-      }
-      else if(strcasecmp(argv[argi], "--nogaps") == 0)
+      if(strcasecmp(argv[argi], "--nogaps") == 0)
       {
         scoring->no_gaps_in_a = true;
         scoring->no_gaps_in_b = true;
@@ -298,12 +238,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       {
         cmd->print_matrices = true;
       }
-      else if(strcasecmp(argv[argi], "--printscores") == 0)
-      {
-        if(cmd_type != SEQ_ALIGN_NW_CMD)
-          usage("--printscores only valid with Needleman-Wunsch");
-        cmd->print_scores = true;
-      }
       else if(strcasecmp(argv[argi], "--printfasta") == 0)
       {
         cmd->print_fasta = true;
@@ -315,12 +249,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       else if(strcasecmp(argv[argi], "--colour") == 0)
       {
         cmd->print_colour = true;
-      }
-      else if(strcasecmp(argv[argi], "--zam") == 0)
-      {
-        if(cmd_type != SEQ_ALIGN_NW_CMD)
-          usage("--zam only valid with Needleman-Wunsch");
-        cmd->zam_stle_output = true;
       }
       else if(strcasecmp(argv[argi], "--stdin") == 0)
       {
@@ -499,14 +427,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
     usage("Match value should not be less than mismatch penalty");
   }
 
-  // Cannot guarantee that we can perform a global alignment if nomismatches
-  // and nogaps is true
-  if(cmd_type == SEQ_ALIGN_NW_CMD && scoring->no_mismatches &&
-     (scoring->no_gaps_in_a || scoring->no_gaps_in_b))
-  {
-    usage("--nogaps.. --nomismatches cannot be used at together");
-  }
-
   // Check for extra unused arguments
   // and set seq1 and seq2 if they have been passed
   if(argi < argc)
@@ -518,14 +438,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
   if(cmd->seq1 == NULL && cmd->file_list_length == 0)
   {
     usage("No input specified");
-  }
-
-  if(cmd->zam_stle_output &&
-     (cmd->print_pretty || cmd->print_scores ||
-      cmd->print_colour || cmd->print_fasta))
-  {
-    usage("Cannot use --printscore, --printfasta, --pretty or --colour with "
-          "--zam");
   }
 
   return cmd;

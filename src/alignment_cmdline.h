@@ -18,7 +18,7 @@
 #include "seq_file/seq_file.h"
 #include "alignment.h"
 
-enum SeqAlignCmdType {SEQ_ALIGN_SW_CMD, SEQ_ALIGN_NW_CMD, SEQ_ALIGN_LCS_CMD};
+enum SeqAlignCmdType {SEQ_ALIGN_SW_CMD};
 
 typedef struct
 {
@@ -36,10 +36,8 @@ typedef struct
   bool min_score_set, max_hits_per_alignment_set;
   bool print_seq;
 
-  // NW specific
-  bool freestartgap_set, freeendgap_set;
-  bool print_matrices, print_scores;
-  bool zam_stle_output;
+  // NW specific?
+  bool print_matrices;
 
   // Turns off zlib for stdin
   bool interactive;

@@ -28,9 +28,6 @@ src/libalign.a: $(OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(OBJFLAGS) $(INCS) -c $< -o $@
 
-bin/needleman_wunsch: src/tools/nw_cmdline.c src/libalign.a | bin
-	$(CC) -o bin/needleman_wunsch $(SRCS) $(TGTFLAGS) $(INCS) $(LIBS) src/tools/nw_cmdline.c $(LINKFLAGS)
-
 bin/smith_waterman: src/tools/sw_cmdline.c src/libalign.a | bin
 	$(CC) -o bin/smith_waterman $(SRCS) $(TGTFLAGS) $(INCS) $(LIBS) src/tools/sw_cmdline.c $(LINKFLAGS)
 
@@ -43,6 +40,9 @@ bin/seq_align_tests: src/tools/tests.c src/libalign.a
 
 examples: src/libalign.a
 	cd examples; $(MAKE) LIBS_PATH=$(abspath $(LIBS_PATH))
+
+prepare_libs:
+	sudo apt-get install zlib1g-dev
 
 bin:
 	mkdir -p bin

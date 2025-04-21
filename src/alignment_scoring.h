@@ -20,10 +20,6 @@ typedef struct
 {
   int gap_open, gap_extend;
 
-  // Needleman Wunsch only
-  // Turn these on to turn off penalties for gaps at the start/end of alignment
-  bool no_start_gap_penalty, no_end_gap_penalty;
-
   // Turn at most one of these on at a time to prevent gaps/mismatches
   bool no_gaps_in_a, no_gaps_in_b, no_mismatches;
 
@@ -57,7 +53,6 @@ extern "C" {
 
 void scoring_init(scoring_t* scoring, int match, int mismatch,
                   int gap_open, int gap_extend,
-                  bool no_start_gap_penalty, bool no_end_gap_penalty,
                   bool no_gaps_in_a, bool no_gaps_in_b,
                   bool no_mismatches, bool case_sensitive);
 
@@ -73,11 +68,6 @@ void scoring_lookup(const scoring_t* scoring, char a, char b,
                     int *score, bool *is_match);
 
 // Some scoring systems
-void scoring_system_PAM30(scoring_t *scoring);
-void scoring_system_PAM70(scoring_t *scoring);
-void scoring_system_BLOSUM80(scoring_t *scoring);
-void scoring_system_BLOSUM62(scoring_t *scoring);
-void scoring_system_DNA_hybridization(scoring_t *scoring);
 void scoring_system_default(scoring_t *scoring); // DNA/RNA default
 
 #ifdef __cplusplus

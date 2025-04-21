@@ -14,7 +14,6 @@
 #include <unistd.h>  // need for getpid() for getting setting rand number
 
 
-#include "needleman_wunsch.h"
 #include "smith_waterman.h"
 
 //
@@ -59,109 +58,6 @@ void SUITE_END()
 #define MAX(x,y) ((x) >= (y) ? (x) : (y))
 #define MIN(x,y) ((x) <= (y) ? (x) : (y))
 
-//
-
-/* No gap is expected in the longer sequence */
-void nw_test_no_gaps_in_longer()
-{
-  nw_aligner_t *nw = needleman_wunsch_new();
-  alignment_t *aln = alignment_create(256);
-
-  const char* seq_a = "aaaaacg";
-  const char* seq_b = "acgt";
-
-  int match = 1;
-  int mismatch = -2;
-  int gap_open = -4;
-  int gap_extend = -1;
-
-  bool no_start_gap_penalty = false, no_end_gap_penalty = false;
-  bool no_gaps_in_a = true, no_gaps_in_b = false;
-  bool no_mismatches = false, case_sensitive = true;
-
-  scoring_t scoring;
-  scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_start_gap_penalty, no_end_gap_penalty,
-               no_gaps_in_a, no_gaps_in_b,
-               no_mismatches, case_sensitive);
-
-  needleman_wunsch_align(seq_a, seq_b, &scoring, nw, aln);
-
-  // ASSERT(strcmp(aln->result_a, "aaaaacg") == 0 &&
-  //        strcmp(aln->result_b, "acgt---") == 0);
-
-  ASSERT(strcmp(aln->result_a, "aaaaacg-") == 0 &&
-         strcmp(aln->result_b, "a----cgt") == 0);
-
-  alignment_free(aln);
-  needleman_wunsch_free(nw);
-}
-
-/* First sequence is aligned to the corresponding (equal) substring of the second
- * sequence because both gaps at start and at end are free */
-void nw_test_free_gaps_at_ends()
-{
-  nw_aligner_t *nw = needleman_wunsch_new();
-  alignment_t *result = alignment_create(256);
-
-  const char* seq_a = "acg";
-  const char* seq_b = "tttacgttt";
-
-  int match = 1;
-  int mismatch = -1;
-  int gap_open = -4;
-  int gap_extend = -1;
-
-  bool no_start_gap_penalty = true, no_end_gap_penalty = true;
-  bool no_gaps_in_a = false, no_gaps_in_b = false;
-  bool no_mismatches = false, case_sensitive = true;
-
-  scoring_t scoring;
-  scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_start_gap_penalty, no_end_gap_penalty,
-               no_gaps_in_a, no_gaps_in_b,
-               no_mismatches, case_sensitive);
-
-  needleman_wunsch_align(seq_a, seq_b, &scoring, nw, result);
-  ASSERT(strcmp(result->result_a, "---acg---") == 0 &&
-         strcmp(result->result_b, "tttacgttt") == 0);
-
-  alignment_free(result);
-  needleman_wunsch_free(nw);
-}
-
-void nw_test_no_mismatches()
-{
-  nw_aligner_t *nw = needleman_wunsch_new();
-  alignment_t *result = alignment_create(256);
-
-  int match = 1;
-  int mismatch = -2;
-  int gap_open = -4;
-  int gap_extend = -1;
-
-  bool no_start_gap_penalty = false, no_end_gap_penalty = false;
-  bool no_gaps_in_a = false, no_gaps_in_b = false;
-  bool no_mismatches = true, case_sensitive = true;
-
-  scoring_t scoring;
-  scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_start_gap_penalty, no_end_gap_penalty,
-               no_gaps_in_a, no_gaps_in_b,
-               no_mismatches, case_sensitive);
-
-  needleman_wunsch_align("atc", "ac", &scoring, nw, result);
-  ASSERT(strcmp(result->result_a, "atc") == 0 &&
-         strcmp(result->result_b, "a-c") == 0);
-
-  needleman_wunsch_align("cgatcga", "catcctcga", &scoring, nw, result);
-  ASSERT(strcmp(result->result_a, "cgatc---ga") == 0 &&
-         strcmp(result->result_b, "c-atcctcga") == 0);
-
-  alignment_free(result);
-  needleman_wunsch_free(nw);
-}
-
 // size is buffer size including NUL byte
 static char* make_rand_seq(char *seq, size_t size)
 {
@@ -171,63 +67,6 @@ static char* make_rand_seq(char *seq, size_t size)
   for(i = 0; i < len; i++) seq[i] = bases[rand() & 3];
   seq[len] = '\0';
   return seq;
-}
-
-void nw_test_no_mismatches_rand()
-{
-  nw_aligner_t *nw = needleman_wunsch_new();
-  alignment_t *aln = alignment_create(256);
-
-  int match = 1;
-  int mismatch = -2;
-  int gap_open = -4;
-  int gap_extend = -1;
-
-  bool no_start_gap_penalty = false, no_end_gap_penalty = false;
-  bool no_gaps_in_a = false, no_gaps_in_b = false;
-  bool no_mismatches = true, case_sensitive = true;
-
-  scoring_t scoring;
-  scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_start_gap_penalty, no_end_gap_penalty,
-               no_gaps_in_a, no_gaps_in_b,
-               no_mismatches, case_sensitive);
-
-  char seqa[100], seqb[100];
-  size_t i;
-
-  // Run 50 random alignments
-  for(i = 0; i < 50; i++)
-  {
-    make_rand_seq(seqa, sizeof(seqa));
-    make_rand_seq(seqb, sizeof(seqb));
-    needleman_wunsch_align(seqa, seqb, &scoring, nw, aln);
-    // Check no mismatches
-    char *a = aln->result_a, *b = aln->result_b;
-    while(1) {
-      ASSERT(*a == '-' || *b == '-' || *a == *b);
-        // printf("Seq: '%s' '%s'\n", aln->result_a, aln->result_b);
-        // exit(EXIT_FAILURE);
-      if(!*a && !*b) break;
-      a++; b++;
-    }
-  }
-
-  alignment_free(aln);
-  needleman_wunsch_free(nw);
-}
-
-
-void test_nw()
-{
-  SUITE_START("Needleman-Wunsch");
-
-  nw_test_no_gaps_in_longer();
-  nw_test_free_gaps_at_ends();
-  nw_test_no_mismatches();
-  nw_test_no_mismatches_rand();
-
-  SUITE_END();
 }
 
 void sw_test_no_gaps_smith_waterman()
@@ -243,13 +82,11 @@ void sw_test_no_gaps_smith_waterman()
   int gap_open = -4;
   int gap_extend = -1;
 
-  bool no_start_gap_penalty = false, no_end_gap_penalty = false;
   bool no_gaps_in_a = true, no_gaps_in_b = true;
   bool no_mismatches = false, case_sensitive = true;
 
   scoring_t scoring;
   scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_start_gap_penalty, no_end_gap_penalty,
                no_gaps_in_a, no_gaps_in_b,
                no_mismatches, case_sensitive);
 
@@ -292,7 +129,6 @@ int main(int argc, char **argv)
   printf("  Test seq-align C library:\n\n");
 
   // Test suites go here
-  test_nw();
   test_sw();
 
   printf("\n");

@@ -166,7 +166,6 @@ Smith-Waterman
             --gapopen <score>    [default: -1]
             --gapextend <score>  [default: -1]
 
-            --scoring <PAM30|PAM70|BLOSUM80|BLOSUM62>
             --substitution_matrix <file>  see details for formatting
             --substitution_pairs <file>   see details for formatting
 
@@ -221,7 +220,6 @@ Needleman-Wunsch
             --gapopen <score>    [default: -4]
             --gapextend <score>  [default: -1]
 
-            --scoring <PAM30|PAM70|BLOSUM80|BLOSUM62>
             --substitution_matrix <file>  see details for formatting
             --substitution_pairs <file>   see details for formatting
 

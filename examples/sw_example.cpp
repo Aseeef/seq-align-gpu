@@ -29,7 +29,6 @@ int main(int argc, char* argv[])
 
   scoring_t scoring;
   scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_start_gap_penalty, no_end_gap_penalty,
                no_gaps_in_a, no_gaps_in_b,
                no_mismatches, case_sensitive);
 
