@@ -67,42 +67,6 @@ void scoring_add_mutation(scoring_t* scoring, char a, char b, int score)
   scoring->max_penalty = MAX2(scoring->max_penalty, score);
 }
 
-void scoring_add_mutations(scoring_t* scoring, const char *str, const int *scores,
-                           char use_match_mismatch)
-{
-  size_t i, j, len = strlen(str);
-  char a, b;
-  int score;
-
-  for(i = 0; i < len; i++)
-  {
-    a = scoring->case_sensitive ? str[i] : tolower(str[i]);
-
-    for(j = 0; j < len; j++)
-    {
-      b = scoring->case_sensitive ? str[j] : tolower(str[j]);
-      score = ARR_LOOKUP(scores, len, i, j);
-
-      scoring_add_mutation(scoring, a, b, score);
-    }
-  }
-
-  scoring->use_match_mismatch = use_match_mismatch;
-}
-
-void scoring_print(const scoring_t* scoring)
-{
-  printf("scoring:\n");
-  printf("  match: %i; mismatch: %i; (use_match_mismatch: %i)\n",
-         scoring->match, scoring->mismatch, scoring->use_match_mismatch);
-
-  printf("  gap_open: %i; gap_extend: %i;\n",
-         scoring->gap_open, scoring->gap_extend);
-
-  printf("  no_gaps_in_a: %i; no_gaps_in_b: %i; no_mismatches: %i;\n",
-         scoring->no_gaps_in_a, scoring->no_gaps_in_b, scoring->no_mismatches);
-}
-
 
 // a, b must be lowercase if !scoring->case_sensitive
 static char _scoring_check_wildcards(const scoring_t* scoring, char a, char b,
