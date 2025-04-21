@@ -20,8 +20,6 @@
 
 const char align_col_mismatch[] = "\033[92m"; // Mismatch (GREEN)
 const char align_col_indel[] = "\033[91m"; // Insertion / deletion (RED)
-// Pink used by SmithWaterman local alignment for printing surrounding bases
-const char align_col_context[] = "\033[95m";
 const char align_col_stop[] = "\033[0m";
 
 // Fill in traceback matrix
@@ -417,27 +415,3 @@ void alignment_colour_print_against(const char *alignment_a,
   }
 }
 
-// Order of alignment_a / alignment_b is not important
-void alignment_print_spacer(const char* alignment_a, const char* alignment_b,
-                            const scoring_t* scoring)
-{
-  int i;
-
-  for(i = 0; alignment_a[i] != '\0'; i++)
-  {
-    if(alignment_a[i] == '-' || alignment_b[i] == '-')
-    {
-      putc(' ', stdout);
-    }
-    else if(alignment_a[i] == alignment_b[i] ||
-            (!scoring->case_sensitive &&
-             tolower(alignment_a[i]) == tolower(alignment_b[i])))
-    {
-      putc('|', stdout);
-    }
-    else
-    {
-      putc('*', stdout);
-    }
-  }
-}

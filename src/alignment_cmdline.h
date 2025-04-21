@@ -32,7 +32,7 @@ typedef struct
 
   // SW specific
   score_t min_score;
-  unsigned int print_context, max_hits_per_alignment;
+  unsigned int max_hits_per_alignment;
   bool min_score_set, max_hits_per_alignment_set;
   bool print_seq;
 

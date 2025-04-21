@@ -49,7 +49,7 @@ extern "C" {
 #endif
 
 // Printing colour codes
-extern const char align_col_mismatch[], align_col_indel[], align_col_context[],
+extern const char align_col_mismatch[], align_col_indel[],
                   align_col_stop[];
 
 #define aligner_init(a) (memset(a, 0, sizeof(aligner_t)))
@@ -74,9 +74,6 @@ void alignment_print_matrices(const aligner_t *aligner);
 void alignment_colour_print_against(const char *alignment_a,
                                     const char *alignment_b,
                                     char case_sensitive);
-
-void alignment_print_spacer(const char* alignment_a, const char* alignment_b,
-                            const scoring_t* scoring);
 
 #ifdef __cplusplus
 }

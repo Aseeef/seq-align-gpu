@@ -47,36 +47,15 @@ static void sw_set_default_scoring()
 
 // Print one line of an alignment
 void print_alignment_part(const char* seq1, const char* seq2,
-                          size_t pos, size_t len,
-                          const char* context_str,
-                          size_t spaces_left, size_t spaces_right,
-                          size_t context_left, size_t context_right)
+                          size_t pos, size_t len)
 {
   size_t i;
   printf("  ");
-
-  for(i = 0; i < spaces_left; i++) printf(" ");
-
-  if(context_left > 0)
-  {
-    if(cmd->print_colour) fputs(align_col_context, stdout);
-    printf("%.*s", (int)context_left, context_str+pos-context_left);
-    if(cmd->print_colour) fputs(align_col_stop, stdout);
-  }
 
   if(cmd->print_colour)
     alignment_colour_print_against(seq1, seq2, scoring.case_sensitive);
   else
     fputs(seq1, stdout);
-
-  if(context_right > 0)
-  {
-    if(cmd->print_colour) fputs(align_col_context, stdout);
-    printf("%.*s", (int)context_right, context_str+pos+len);
-    if(cmd->print_colour) fputs(align_col_stop, stdout);
-  }
-
-  for(i = 0; i < spaces_right; i++) putc(' ', stdout);
 
   printf("  [pos: %li; len: %lu]\n", pos, len);
 }
@@ -205,12 +184,6 @@ void align(const char *seq_a, const char *seq_b,
 
   size_t hit_index = 0;
 
-  // For print context
-  size_t context_left = 0, context_right = 0;
-  size_t left_spaces_a = 0, left_spaces_b = 0;
-  size_t right_spaces_a = 0, right_spaces_b = 0;
-
-
   while(get_next_hit() &&
         smith_waterman_fetch(sw, result) && result->score >= cmd->min_score &&
         (!cmd->max_hits_per_alignment_set ||
@@ -218,87 +191,13 @@ void align(const char *seq_a, const char *seq_b,
   {
     printf("hit %zu.%zu score: %i\n", alignment_index, hit_index++, result->score);
 
-    if(cmd->print_context)
-    {
-      // Calculate number of characters of context to print either side
-      context_left = MAX2(result->pos_a, result->pos_b);
-      context_left = MIN2(context_left, cmd->print_context);
-
-      size_t rem_a = len_a - (result->pos_a + result->len_a);
-      size_t rem_b = len_b - (result->pos_b + result->len_b);
-
-      context_right = MAX2(rem_a, rem_b);
-      context_right = MIN2(context_right, cmd->print_context);
-
-      left_spaces_a = (context_left > result->pos_a)
-                      ? context_left - result->pos_a : 0;
-
-      left_spaces_b = (context_left > result->pos_b)
-                      ? context_left - result->pos_b : 0;
-
-      right_spaces_a = (context_right > rem_a) ? context_right - rem_a : 0;
-      right_spaces_b = (context_right > rem_b) ? context_right - rem_b : 0;
-    }
-
-    #ifdef SEQ_ALIGN_VERBOSE
-    printf("context left = %lu; right = %lu spacing: [%lu,%lu] [%lu,%lu]\n",
-           context_left, context_right,
-           left_spaces_a, right_spaces_a,
-           left_spaces_b, right_spaces_b);
-    #endif
-
     // seq a
     print_alignment_part(result->result_a, result->result_b,
-                         result->pos_a, result->len_a,
-                         seq_a,
-                         left_spaces_a, right_spaces_a,
-                         context_left-left_spaces_a,
-                         context_right-right_spaces_a);
-
-    if(cmd->print_pretty)
-    {
-      fputs("  ", stdout);
-
-      size_t max_left_spaces = MAX2(left_spaces_a, left_spaces_b);
-      size_t max_right_spaces = MAX2(right_spaces_a, right_spaces_b);
-      size_t spacer;
-
-      // Print spaces for lefthand spacing
-      for(spacer = 0; spacer < max_left_spaces; spacer++)
-      {
-        putc(' ', stdout);
-      }
-
-      // Print dots for lefthand context sequence
-      for(spacer = 0; spacer < context_left-max_left_spaces; spacer++)
-      {
-        putc('.', stdout);
-      }
-
-      alignment_print_spacer(result->result_a, result->result_b, &scoring);
-
-      // Print dots for righthand context sequence
-      for(spacer = 0; spacer < context_right-max_right_spaces; spacer++)
-      {
-        putc('.', stdout);
-      }
-
-      // Print spaces for righthand spacing
-      for(spacer = 0; spacer < max_right_spaces; spacer++)
-      {
-        putc(' ', stdout);
-      }
-
-      putc('\n', stdout);
-    }
+                         result->pos_a, result->len_a);
 
     // seq b
     print_alignment_part(result->result_b, result->result_a,
-                         result->pos_b, result->len_b,
-                         seq_b,
-                         left_spaces_b, right_spaces_b,
-                         context_left-left_spaces_b,
-                         context_right-right_spaces_b);
+                         result->pos_b, result->len_b);
 
     printf("\n");
 

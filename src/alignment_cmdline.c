@@ -114,7 +114,6 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 "    --maxhits <hits>     Maximum number of results per alignment\n"
 "                         [default: no limit]\n"
 "\n"
-"    --context <n>        Print <n> bases of context\n"
 "    --printseq           Print sequences before local alignments\n");
   }
 
@@ -267,16 +266,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
           usage("Invalid --maxhits <hits> argument (must be a +ve int)");
 
         cmd->max_hits_per_alignment_set = true;
-
-        argi++;
-      }
-      else if(strcasecmp(argv[argi], "--context") == 0)
-      {
-        if(cmd_type != SEQ_ALIGN_SW_CMD)
-          usage("--context only valid with Smith-Waterman");
-
-        if(!parse_entire_uint(argv[argi+1], &cmd->print_context))
-          usage("Invalid --context <c> argument (must be >= 0)");
 
         argi++;
       }

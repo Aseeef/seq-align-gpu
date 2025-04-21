@@ -11,7 +11,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <limits.h> // INT_MAX
 #include <string.h> // memset
 #include <ctype.h> // tolower
 
