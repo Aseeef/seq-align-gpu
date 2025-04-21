@@ -140,8 +140,6 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 
 void cmdline_free(cmdline_t *cmd)
 {
-  free(cmd->file_paths1);
-  free(cmd->file_paths2);
   free(cmd);
 }
 
@@ -151,10 +149,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
                        enum SeqAlignCmdType cmd_type)
 {
   cmdline_t* cmd = calloc(1, sizeof(cmdline_t));
-  cmd->file_list_length = 0;
-  cmd->file_list_capacity = 256;
-  cmd->file_paths1 = malloc(sizeof(char*) * cmd->file_list_capacity);
-  cmd->file_paths2 = malloc(sizeof(char*) * cmd->file_list_capacity);
   cmd->seq1 = cmd->seq2 = NULL;
   // All values initially 0
 
@@ -219,7 +213,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       else if(strcasecmp(argv[argi], "--stdin") == 0)
       {
         // Similar to --file argument below
-        cmdline_add_files(cmd, "", NULL);
+        cmdline_set_files(cmd, "", NULL);
         cmd->interactive = true;
       }
       else if(argi == argc-1)
@@ -310,12 +304,13 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       }
       else if(strcasecmp(argv[argi], "--file") == 0)
       {
-        cmdline_add_files(cmd, argv[argi+1], NULL);
+        cmdline_set_files(cmd, argv[argi+1], NULL);
         argi++; // took an argument
       }
       // Remaining options take two arguments but check themselves
       else if(strcasecmp(argv[argi], "--files") == 0)
       {
+          printf("Adding %s and %s", argv[argi+1], argv[argi+2]);
         if(argi >= argc-2)
         {
           usage("--files option takes 2 arguments");
@@ -323,11 +318,11 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
         else if(strcmp(argv[argi+1], "-") == 0 && strcmp(argv[argi+2], "-") == 0)
         {
           // Read both from stdin
-          cmdline_add_files(cmd, argv[argi+1], NULL);
+          cmdline_set_files(cmd, argv[argi+1], NULL);
         }
         else
         {
-          cmdline_add_files(cmd, argv[argi+1], argv[argi+2]);
+          cmdline_set_files(cmd, argv[argi+1], argv[argi+2]);
         }
 
         argi += 2; // took two arguments
@@ -359,7 +354,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
     cmd->seq2 = argv[argi+1];
   }
 
-  if(cmd->seq1 == NULL && cmd->file_list_length == 0)
+  if(cmd->seq1 == NULL && (cmd->file_path1 == NULL || cmd->file_path2 == NULL))
   {
     usage("No input specified");
   }
@@ -368,45 +363,82 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
 }
 
 
-void cmdline_add_files(cmdline_t *cmd, char* p1, char* p2)
+void cmdline_set_files(cmdline_t *cmd, char* query, char* database)
 {
-  if(cmd->file_list_length == cmd->file_list_capacity)
-  {
-    cmd->file_list_capacity *= 2;
-    size_t mem = sizeof(char*) * cmd->file_list_capacity;
-    cmd->file_paths1 = realloc(cmd->file_paths1, mem);
-    cmd->file_paths2 = realloc(cmd->file_paths2, mem);
-
-    if(cmd->file_paths1 == NULL || cmd->file_paths2 == NULL) {
-      fprintf(stderr, "%s:%i: Out of memory\n", __FILE__, __LINE__);
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  cmd->file_paths1[cmd->file_list_length] = p1;
-  cmd->file_paths2[cmd->file_list_length] = p2;
-  cmd->file_list_length++;
+  cmd->file_path1 = query;
+  cmd->file_path2 = database;
 }
 
-size_t cmdline_get_num_of_file_pairs(cmdline_t *cmd)
+char* cmdline_get_file1(cmdline_t *cmd)
 {
-  return cmd->file_list_length;
+  return cmd->file_path1;
 }
 
-char* cmdline_get_file1(cmdline_t *cmd, size_t i)
+char* cmdline_get_file2(cmdline_t *cmd)
 {
-  return cmd->file_paths1[i];
-}
-
-char* cmdline_get_file2(cmdline_t *cmd, size_t i)
-{
-  return cmd->file_paths2[i];
+  return cmd->file_path2;
 }
 
 static seq_file_t* open_seq_file(const char *path, bool use_zlib)
 {
   return (strcmp(path,"-") != 0 || use_zlib) ? seq_open(path)
                                              : seq_dopen(fileno(stdin), false, false, 0);
+}
+
+void align_from_query_and_db(const char *query_path, const char *db_path,
+                     void (align)(const char *query_seq, const char *db_seq,
+                                  const char *query_name, const char *db_name),
+                     bool use_zlib)
+{
+    seq_file_t *query_file, *db_file;
+
+    // Open query file
+    if((query_file = open_seq_file(query_path, use_zlib)) == NULL)
+    {
+        fprintf(stderr, "Error: couldn't open query file %s\n", query_path);
+        fflush(stderr);
+        return;
+    }
+
+    // Open database file
+    if((db_file = open_seq_file(db_path, use_zlib)) == NULL)
+    {
+        fprintf(stderr, "Error: couldn't open database file %s\n", db_path);
+        fflush(stderr);
+        seq_close(query_file);
+        return;
+    }
+
+    // Read the single query sequence
+    read_t query_read;
+    seq_read_alloc(&query_read);
+
+    if(seq_read(query_file, &query_read) <= 0)
+    {
+        fprintf(stderr, "Error: Query file %s is empty or invalid\n", query_path);
+        fflush(stderr);
+        seq_close(query_file);
+        seq_close(db_file);
+        seq_read_dealloc(&query_read);
+        return;
+    }
+
+    // Read database sequences and align each with the query
+    read_t db_read;
+    seq_read_alloc(&db_read);
+
+    while(seq_read(db_file, &db_read) > 0)
+    {
+        align(query_read.seq.b, db_read.seq.b,
+              (query_read.name.end == 0 ? NULL : query_read.name.b),
+              (db_read.name.end == 0 ? NULL : db_read.name.b));
+    }
+
+    // Close files and free memory
+    seq_close(query_file);
+    seq_close(db_file);
+    seq_read_dealloc(&query_read);
+    seq_read_dealloc(&db_read);
 }
 
 // If seq2 is NULL, read pair of entries from first file

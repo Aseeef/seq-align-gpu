@@ -23,8 +23,7 @@ enum SeqAlignCmdType {SEQ_ALIGN_SW_CMD};
 typedef struct
 {
   // file inputs
-  size_t file_list_length, file_list_capacity;
-  char **file_paths1, **file_paths2;
+  char *file_path1, *file_path2;
 
   // All values initially 0
   bool case_sensitive;
@@ -56,13 +55,14 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
                        enum SeqAlignCmdType cmd_type);
 void cmdline_free(cmdline_t* cmd);
 
-void cmdline_add_files(cmdline_t* cmd, char* p1, char* p2);
-size_t cmdline_get_num_of_file_pairs(cmdline_t* cmd);
-char* cmdline_get_file1(cmdline_t* cmd, size_t i);
-char* cmdline_get_file2(cmdline_t* cmd, size_t i);
+void cmdline_set_files(cmdline_t* cmd, char* p1, char* p2);
+char* cmdline_get_file1(cmdline_t* cmd);
+char* cmdline_get_file2(cmdline_t* cmd);
 
-void align_from_file(const char *path1, const char *path2,
-                     void (align)(read_t *r1, read_t *r2),
-                     bool use_zlib);
+
+void align_from_query_and_db(const char *query_path, const char *db_path,
+                              void (align)(const char *query_seq, const char *db_seq,
+                                           const char *query_name, const char *db_name),
+                              bool use_zlib);
 
 #endif

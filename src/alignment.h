@@ -68,10 +68,6 @@ void aligner_destroy(aligner_t *aligner);
 // Printing
 void alignment_print_matrices(const aligner_t *aligner);
 
-void alignment_colour_print_against(const char *alignment_a,
-                                    const char *alignment_b,
-                                    char case_sensitive);
-
 #ifdef __cplusplus
 }
 #endif
