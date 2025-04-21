@@ -56,7 +56,7 @@ extern const char align_col_mismatch[], align_col_indel[],
 void aligner_align(aligner_t *aligner,
                    const char *seq_a, const char *seq_b,
                    size_t len_a, size_t len_b,
-                   const scoring_t *scoring, char is_sw);
+                   const scoring_t *scoring);
 void aligner_destroy(aligner_t *aligner);
 
 // Constructors/Destructors for alignment

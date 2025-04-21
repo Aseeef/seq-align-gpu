@@ -140,7 +140,7 @@ void smith_waterman_align2(const char *a, const char *b,
 {
   aligner_t *aligner = &sw->aligner;
   sw_history_t *hist = &sw->history;
-  aligner_align(aligner, a, b, len_a, len_b, scoring, 1);
+  aligner_align(aligner, a, b, len_a, len_b, scoring);
 
   size_t arr_size = aligner->score_width * aligner->score_height;
   _ensure_history_capacity(hist, arr_size);

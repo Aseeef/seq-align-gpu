@@ -23,7 +23,7 @@ const char align_col_indel[] = "\033[91m"; // Insertion / deletion (RED)
 const char align_col_stop[] = "\033[0m";
 
 // Fill in traceback matrix
-static void alignment_fill_matrices(aligner_t *aligner, char is_sw)
+static void alignment_fill_matrices(aligner_t *aligner)
 {
   score_t *match_scores = aligner->match_scores;
   score_t *gap_a_scores = aligner->gap_a_scores;
@@ -36,7 +36,7 @@ static void alignment_fill_matrices(aligner_t *aligner, char is_sw)
   int gap_open_penalty = scoring->gap_extend + scoring->gap_open;
   int gap_extend_penalty = scoring->gap_extend;
 
-  const score_t min = is_sw ? 0 : SCORE_MIN + abs(scoring->min_penalty);
+  const score_t min = 0;
 
   size_t seq_i, seq_j, len_i = score_width-1, len_j = score_height-1;
   size_t index, index_left, index_up, index_upleft;
@@ -46,35 +46,10 @@ static void alignment_fill_matrices(aligner_t *aligner, char is_sw)
   gap_a_scores[0] = 0;
   gap_b_scores[0] = 0;
 
-  if(is_sw)
-  {
-    for(i = 1; i < score_width; i++)
+  for(i = 1; i < score_width; i++)
       match_scores[i] = gap_a_scores[i] = gap_b_scores[i] = 0;
-    for(j = 1, index = score_width; j < score_height; j++, index += score_width)
+  for(j = 1, index = score_width; j < score_height; j++, index += score_width)
       match_scores[index] = gap_a_scores[index] = gap_b_scores[index] = min;
-  }
-  else
-  {
-    // work along first row -> [i][0]
-    for(i = 1; i < score_width; i++)
-    {
-      match_scores[i] = min;
-
-      // Think carefully about which way round these are
-      gap_a_scores[i] = min;
-      gap_b_scores[i] = scoring->gap_open + (int)i * scoring->gap_extend;
-    }
-
-    // work down first column -> [0][j]
-    for(j = 1, index = score_width; j < score_height; j++, index += score_width)
-    {
-      match_scores[index] = min;
-
-      // Think carefully about which way round these are
-      gap_a_scores[index] = scoring->gap_open + (int)j * scoring->gap_extend;
-      gap_b_scores[index] = min;
-    }
-  }
 
   // start at position [1][1]
   index_upleft = 0;
@@ -147,7 +122,7 @@ static void alignment_fill_matrices(aligner_t *aligner, char is_sw)
 void aligner_align(aligner_t *aligner,
                    const char *seq_a, const char *seq_b,
                    size_t len_a, size_t len_b,
-                   const scoring_t *scoring, char is_sw)
+                   const scoring_t *scoring)
 {
   aligner->scoring = scoring;
   aligner->seq_a = seq_a;
@@ -166,7 +141,7 @@ void aligner_align(aligner_t *aligner,
     aligner->gap_b_scores = realloc(aligner->gap_b_scores, mem);
   }
 
-  alignment_fill_matrices(aligner, is_sw);
+  alignment_fill_matrices(aligner);
 }
 
 void aligner_destroy(aligner_t *aligner)
