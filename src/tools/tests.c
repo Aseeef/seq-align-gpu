@@ -72,7 +72,6 @@ static char* make_rand_seq(char *seq, size_t size)
 void sw_test_no_gaps_smith_waterman()
 {
   sw_aligner_t *sw = smith_waterman_new();
-  alignment_t *result = alignment_create(256);
 
   const char* seq_a = "gacag";
   const char* seq_b = "tgaagt";
@@ -89,15 +88,6 @@ void sw_test_no_gaps_smith_waterman()
 
   smith_waterman_align(seq_a, seq_b, &scoring, sw);
 
-  smith_waterman_fetch(sw, result);
-  ASSERT(strcmp(result->result_a, "ga") == 0 &&
-         strcmp(result->result_b, "ga") == 0);
-
-  smith_waterman_fetch(sw, result);
-  ASSERT(strcmp(result->result_a, "ag") == 0 &&
-         strcmp(result->result_b, "ag") == 0);
-
-  alignment_free(result);
   smith_waterman_free(sw);
 }
 

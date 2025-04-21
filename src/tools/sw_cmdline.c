@@ -29,7 +29,6 @@ scoring_t scoring;
 
 // Alignment results stored here
 sw_aligner_t *sw;
-alignment_t *result;
 
 size_t alignment_index = 0;
 bool wait_on_keystroke = 0;
@@ -184,26 +183,8 @@ void align(const char *seq_a, const char *seq_b,
 
   size_t hit_index = 0;
 
-  while(get_next_hit() &&
-        smith_waterman_fetch(sw, result) && result->score >= cmd->min_score &&
-        (!cmd->max_hits_per_alignment_set ||
-         hit_index < cmd->max_hits_per_alignment))
-  {
-    printf("hit %zu.%zu score: %i\n", alignment_index, hit_index++, result->score);
 
-    // seq a
-    print_alignment_part(result->result_a, result->result_b,
-                         result->pos_a, result->len_a);
-
-    // seq b
-    print_alignment_part(result->result_b, result->result_a,
-                         result->pos_b, result->len_b);
-
-    printf("\n");
-
-    // Flush output here
-    fflush(stdout);
-  }
+  printf("score: %i\n", aligner->max_score);
 
   fputs("==\n", stdout);
   fflush(stdout);
@@ -230,7 +211,6 @@ int main(int argc, char* argv[])
 
   // Align!
   sw = smith_waterman_new();
-  result = alignment_create(256);
 
   if(cmd->seq1 != NULL)
   {
@@ -253,7 +233,6 @@ int main(int argc, char* argv[])
 
   // Free memory for storing alignment results
   smith_waterman_free(sw);
-  alignment_free(result);
 
   cmdline_free(cmd);
 

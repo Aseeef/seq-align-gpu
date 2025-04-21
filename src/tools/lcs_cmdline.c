@@ -45,21 +45,10 @@ int main(int argc, char **argv)
 
   // Alignment results stored here
   sw_aligner_t *sw = smith_waterman_new();
-  alignment_t *aln = alignment_create(seqlen+1);
 
   smith_waterman_align(seq, seq, &scoring, sw);
 
-  // Loop over results
-  while(smith_waterman_fetch(sw, aln))
-  {
-    if(aln->pos_a < aln->pos_b) {
-      fputs(aln->result_a, stdout);
-      printf(" [%zu,%zu]\n", aln->pos_a, aln->pos_b);
-    }
-  }
-
   smith_waterman_free(sw);
-  alignment_free(aln);
 
   return EXIT_SUCCESS;
 }

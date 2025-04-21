@@ -73,11 +73,15 @@ static void alignment_fill_matrices(aligner_t *aligner)
       // 1) continue alignment
       // 2) close gap in seq_a
       // 3) close gap in seq_b
-      match_scores[index]
-        = MAX4(match_scores[index_upleft] + substitution_penalty,
-               gap_a_scores[index_upleft] + substitution_penalty,
-               gap_b_scores[index_upleft] + substitution_penalty,
-               min);
+      score_t match_score = MAX4(match_scores[index_upleft] + substitution_penalty,
+                                  gap_a_scores[index_upleft] + substitution_penalty,
+                                  gap_b_scores[index_upleft] + substitution_penalty,
+                                  min);
+      match_scores[index] = match_score;
+
+      // update best score
+      if (aligner->max_score < match_score)
+          aligner->max_score = match_score;
 
       // Long arithmetic since some INTs are set to min and penalty is -ve
       // (adding as ints would cause an integer overflow)
@@ -129,6 +133,7 @@ void aligner_align(aligner_t *aligner,
   aligner->seq_b = seq_b;
   aligner->score_width = len_a+1;
   aligner->score_height = len_b+1;
+  aligner->max_score = 0;
 
   size_t new_capacity = aligner->score_width * aligner->score_height;
 
@@ -150,144 +155,6 @@ void aligner_destroy(aligner_t *aligner)
     free(aligner->match_scores);
     free(aligner->gap_a_scores);
     free(aligner->gap_b_scores);
-  }
-}
-
-
-alignment_t* alignment_create(size_t capacity)
-{
-  capacity = ROUNDUP2POW(capacity);
-  alignment_t *result = malloc(sizeof(alignment_t));
-  result->result_a = malloc(sizeof(char)*capacity);
-  result->result_b = malloc(sizeof(char)*capacity);
-  result->capacity = capacity;
-  result->length = 0;
-  result->result_a[0] = result->result_b[0] = '\0';
-  result->pos_a = result->pos_b = result->len_a = result->len_b = 0;
-  result->score = 0;
-  return result;
-}
-
-void alignment_ensure_capacity(alignment_t* result, size_t strlength)
-{
-  size_t capacity = strlength+1;
-  if(result->capacity < capacity)
-  {
-    capacity = ROUNDUP2POW(capacity);
-    result->result_a = realloc(result->result_a, sizeof(char)*capacity);
-    result->result_b = realloc(result->result_b, sizeof(char)*capacity);
-    result->capacity = capacity;
-    if(result->result_a == NULL || result->result_b == NULL) {
-      fprintf(stderr, "%s:%i: Out of memory\n", __FILE__, __LINE__);
-      exit(EXIT_FAILURE);
-    }
-  }
-}
-
-void alignment_free(alignment_t* result)
-{
-  free(result->result_a);
-  free(result->result_b);
-  free(result);
-}
-
-
-// Backtrack through scoring matrices
-void alignment_reverse_move(enum Matrix *curr_matrix, score_t *curr_score,
-                            size_t *score_x, size_t *score_y,
-                            size_t *arr_index, const aligner_t *aligner)
-{
-  size_t seq_x = (*score_x)-1, seq_y = (*score_y)-1;
-  size_t len_i = aligner->score_width-1, len_j = aligner->score_height-1;
-
-  bool is_match;
-  int match_penalty;
-  const scoring_t *scoring = aligner->scoring;
-
-  scoring_lookup(scoring, aligner->seq_a[seq_x], aligner->seq_b[seq_y],
-                 &match_penalty, &is_match);
-
-  int gap_a_open_penalty, gap_b_open_penalty;
-  int gap_a_extend_penalty, gap_b_extend_penalty;
-
-  gap_a_open_penalty = gap_b_open_penalty = scoring->gap_extend + scoring->gap_open;
-  gap_a_extend_penalty = gap_b_extend_penalty = scoring->gap_extend;
-
-  int prev_match_penalty, prev_gap_a_penalty, prev_gap_b_penalty;
-
-  switch(*curr_matrix)
-  {
-    case MATCH:
-      prev_match_penalty = match_penalty;
-      prev_gap_a_penalty = match_penalty;
-      prev_gap_b_penalty = match_penalty;
-      (*score_x)--;
-      (*score_y)--;
-      (*arr_index) -= aligner->score_width + 1;
-      break;
-
-    case GAP_A:
-      prev_match_penalty = gap_a_open_penalty;
-      prev_gap_a_penalty = gap_a_extend_penalty;
-      prev_gap_b_penalty = gap_a_open_penalty;
-      (*score_y)--;
-      (*arr_index) -= aligner->score_width;
-      break;
-
-    case GAP_B:
-      prev_match_penalty = gap_b_open_penalty;
-      prev_gap_a_penalty = gap_b_open_penalty;
-      prev_gap_b_penalty = gap_b_extend_penalty;
-      (*score_x)--;
-      (*arr_index)--;
-      break;
-
-    default:
-      fprintf(stderr, "Program error: invalid matrix in get_reverse_move()\n");
-      fprintf(stderr, "Please submit a bug report to: turner.isaac@gmail.com\n");
-      exit(EXIT_FAILURE);
-  }
-
-  // *arr_index = ARR_2D_INDEX(aligner->score_width, *score_x, *score_y);
-
-  if((*score_x == 0 || *score_x == len_i) &&
-     aligner->gap_a_scores[*arr_index] + prev_gap_a_penalty == *curr_score)
-  {
-    *curr_matrix = GAP_A;
-    *curr_score = aligner->gap_a_scores[*arr_index];
-  }
-  else if((*score_y == 0 || *score_y == len_j) &&
-          aligner->gap_b_scores[*arr_index] + prev_gap_b_penalty == *curr_score)
-  {
-    *curr_matrix = GAP_B;
-    *curr_score = aligner->gap_b_scores[*arr_index];
-  }
-  else if(aligner->match_scores[*arr_index] + prev_match_penalty == *curr_score)
-  {
-    *curr_matrix = MATCH;
-    *curr_score = aligner->match_scores[*arr_index];
-  }
-  else
-  {
-    alignment_print_matrices(aligner);
-
-    fprintf(stderr, "[%s:%zu,%zu]: %i [ismatch: %i] '%c' '%c'\n",
-            MATRIX_NAME(*curr_matrix), *score_x, *score_y, *curr_score,
-            is_match, aligner->seq_a[seq_x], aligner->seq_b[seq_y]);
-    fprintf(stderr, " Penalties match: %i gap_open: %i gap_extend: %i\n",
-            prev_match_penalty, prev_gap_a_penalty, prev_gap_b_penalty);
-    fprintf(stderr, " Expected MATCH: %i GAP_A: %i GAP_B: %i\n",
-            aligner->match_scores[*arr_index],
-            aligner->gap_a_scores[*arr_index],
-            aligner->gap_b_scores[*arr_index]);
-
-    fprintf(stderr,
-"Program error: traceback fail (get_reverse_move)\n"
-"This may be due to an integer overflow if your sequences are long or scores\n"
-"are large. If this is the case using smaller scores or shorter sequences may\n"
-"work around this problem.  \n"
-"  If you think this is a bug, please report it to: turner.isaac@gmail.com\n");
-    exit(EXIT_FAILURE);
   }
 }
 

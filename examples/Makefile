@@ -6,13 +6,13 @@ INCS=-I $(LIBS_PATH) -I ../src
 LIBS=-L $(LIBS_PATH)/string_buffer -L ../src
 LINK=-lalign -lstrbuf -lpthread -lz
 
-all: sw_example sw_cpp
+all: sw_example
 
 # C Examples
 sw_example: sw_example.c ../src/libalign.a
 	$(CC) $< -o $@ $(CFLAGS) $(INCS) $(LIBS) $(LINK)
 
 clean:
-	rm -rf sw_example sw_cpp *.greg *.dSYM
+	rm -rf sw_example *.greg *.dSYM
 
 .PHONY: all clean

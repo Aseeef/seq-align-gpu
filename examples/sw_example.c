@@ -16,7 +16,6 @@ void align(char* seq_a, char* seq_b)
 {
   // Variables to store alignment result
   sw_aligner_t *sw = smith_waterman_new();
-  alignment_t *result = alignment_create(256);
 
   // Decide on scoring
   int match = 1;
@@ -40,16 +39,8 @@ void align(char* seq_a, char* seq_b)
 
   smith_waterman_align(seq_a, seq_b, &scoring, sw);
 
-  while(smith_waterman_fetch(sw, result))
-  {
-    printf("seqA: %s [start:%zu]\n", result->result_a, result->pos_a);
-    printf("seqB: %s [start:%zu]\n", result->result_b, result->pos_b);
-    printf("alignment score: %i\n\n", result->score);
-  }
-
   // Free memory for storing alignment results
   smith_waterman_free(sw);
-  alignment_free(result);
 }
 
 int main(int argc, char* argv[])
