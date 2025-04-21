@@ -169,8 +169,6 @@ Smith-Waterman
             --substitution_matrix <file>  see details for formatting
             --substitution_pairs <file>   see details for formatting
 
-            --wildcard <w> <s>   Character <w> matches all characters with score <s>
-
             --minscore <score>   Minimum required score
                                  [default: match * MAX(0.2 * length, 2)]
             --maxhits <hits>     Maximum number of results per alignment
@@ -222,9 +220,6 @@ Needleman-Wunsch
 
             --substitution_matrix <file>  see details for formatting
             --substitution_pairs <file>   see details for formatting
-
-            --wildcard <w> <s>   Character <w> matches all characters with score <s>
-
 
             --freestartgap       No penalty for gap at start of alignment
             --freeendgap         No penalty for gap at end of alignment

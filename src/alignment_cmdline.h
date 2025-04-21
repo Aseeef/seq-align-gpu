@@ -45,10 +45,6 @@ typedef struct
   // General output
   bool print_fasta, print_pretty, print_colour;
 
-  // Experimental
-  bool no_gaps_in1, no_gaps_in2;
-  bool no_mismatches;
-
   // Pair of sequences to align
   const char *seq1, *seq2;
 } cmdline_t;

@@ -24,15 +24,11 @@ void align(char* seq_a, char* seq_b)
   int gap_open = -4;
   int gap_extend = -1;
 
-  char no_gaps_in_a = 0, no_gaps_in_b = 0;
-  char no_mismatches = 0;
-
   // Compare character case-sensitively (usually set to 0 for DNA etc)
   char case_sensitive = 0;
 
   scoring_t scoring;
-  scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_gaps_in_a, no_gaps_in_b, no_mismatches, case_sensitive);
+  scoring_init(&scoring, match, mismatch, gap_open, gap_extend, case_sensitive);
 
   // Add some special cases
   // x -> y means x in seq1 changing to y in seq2

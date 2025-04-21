@@ -96,28 +96,21 @@ static void alignment_fill_matrices(aligner_t *aligner, char is_sw)
       scoring_lookup(scoring, aligner->seq_a[seq_i], aligner->seq_b[seq_j],
                      &substitution_penalty, &is_match);
 
-      if(scoring->no_mismatches && !is_match)
-      {
-        match_scores[index] = min;
-      }
-      else
-      {
-        // substitution
-        // 1) continue alignment
-        // 2) close gap in seq_a
-        // 3) close gap in seq_b
-        match_scores[index]
-          = MAX4(match_scores[index_upleft] + substitution_penalty,
-                 gap_a_scores[index_upleft] + substitution_penalty,
-                 gap_b_scores[index_upleft] + substitution_penalty,
-                 min);
-      }
+      // substitution
+      // 1) continue alignment
+      // 2) close gap in seq_a
+      // 3) close gap in seq_b
+      match_scores[index]
+        = MAX4(match_scores[index_upleft] + substitution_penalty,
+               gap_a_scores[index_upleft] + substitution_penalty,
+               gap_b_scores[index_upleft] + substitution_penalty,
+               min);
 
       // Long arithmetic since some INTs are set to min and penalty is -ve
       // (adding as ints would cause an integer overflow)
 
       // Update gap_a_scores[i][j] from position [i][j-1]
-      if(!scoring->no_gaps_in_a || seq_i == len_i-1)
+      if(seq_i == len_i-1)
       {
         gap_a_scores[index]
           = MAX4(match_scores[index_up] + gap_open_penalty,
@@ -129,7 +122,7 @@ static void alignment_fill_matrices(aligner_t *aligner, char is_sw)
         gap_a_scores[index] = min;
 
       // Update gap_b_scores[i][j] from position [i-1][j]
-      if(!scoring->no_gaps_in_b || seq_j == len_j-1)
+      if(seq_j == len_j-1)
       {
         gap_b_scores[index]
           = MAX4(match_scores[index_left] + gap_open_penalty,
@@ -284,13 +277,13 @@ void alignment_reverse_move(enum Matrix *curr_matrix, score_t *curr_score,
 
   // *arr_index = ARR_2D_INDEX(aligner->score_width, *score_x, *score_y);
 
-  if((!scoring->no_gaps_in_a || *score_x == 0 || *score_x == len_i) &&
+  if((*score_x == 0 || *score_x == len_i) &&
      aligner->gap_a_scores[*arr_index] + prev_gap_a_penalty == *curr_score)
   {
     *curr_matrix = GAP_A;
     *curr_score = aligner->gap_a_scores[*arr_index];
   }
-  else if((!scoring->no_gaps_in_b || *score_y == 0 || *score_y == len_j) &&
+  else if((*score_y == 0 || *score_y == len_j) &&
           aligner->gap_b_scores[*arr_index] + prev_gap_b_penalty == *curr_score)
   {
     *curr_matrix = GAP_B;

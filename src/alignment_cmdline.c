@@ -101,9 +101,7 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 "    --gapopen <score>    [default: %i]\n"
 "    --gapextend <score>  [default: %i]\n"
 "\n"
-"    --substitution_matrix <file>  see details for formatting\n"
-"\n"
-"    --wildcard <w> <s>   Character <w> matches all characters with score <s>\n\n",
+"    --substitution_matrix <file>  see details for formatting\n\n",
           defaults[0], defaults[1],
           defaults[2], defaults[3]);
 
@@ -125,15 +123,7 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 "    --printfasta         Print fasta header lines\n"
 "    --pretty             Print with a descriptor line\n"
 "    --colour             Print with colour\n"
-"\n"
-"  Experimental Options:\n"
-"    --nogapsin1          No gaps allowed within the first sequence\n"
-"    --nogapsin2          No gaps allowed within the second sequence\n"
-"    --nogaps             No gaps allowed in either sequence\n");
-
-  fprintf(stderr,
-"    --nomismatches       No mismatches allowed%s\n",
-          cmd_type == SEQ_ALIGN_SW_CMD ? "" : " (cannot be used with --nogaps..)");
+"\n");
 
   printf(
 "\n"
@@ -200,25 +190,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
   {
     if(argv[argi][0] == '-')
     {
-      // strcasecmp does case insensitive comparison
-      if(strcasecmp(argv[argi], "--nogaps") == 0)
-      {
-        scoring->no_gaps_in_a = true;
-        scoring->no_gaps_in_b = true;
-      }
-      else if(strcasecmp(argv[argi], "--nogapsin1") == 0)
-      {
-        scoring->no_gaps_in_a = true;
-      }
-      else if(strcasecmp(argv[argi], "--nogapsin2") == 0)
-      {
-        scoring->no_gaps_in_b = true;
-      }
-      else if(strcasecmp(argv[argi], "--nomismatches") == 0)
-      {
-        scoring->no_mismatches = true;
-      }
-      else if(strcasecmp(argv[argi], "--case_sensitive") == 0)
+        if(strcasecmp(argv[argi], "--case_sensitive") == 0)
       {
         // Already dealt with
         //case_sensitive = true;
@@ -371,20 +343,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
 
         argi += 2; // took two arguments
       }
-      else if(strcasecmp(argv[argi], "--wildcard") == 0)
-      {
-        int wildscore = 0;
-
-        if(argi == argc-2 || strlen(argv[argi+1]) != 1 ||
-           !parse_entire_int(argv[argi+2], &wildscore))
-        {
-          usage("--wildcard <w> <s> takes a single character and a number");
-        }
-
-        scoring_add_wildcard(scoring, argv[argi+1][0], wildscore);
-
-        argi += 2; // took two arguments
-      }
       else usage("Unknown argument '%s'", argv[argi]);
     }
     else
@@ -394,12 +352,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
     }
   }
 
-  if((match_set && !mismatch_set && !scoring->no_mismatches) ||
-     (!match_set && mismatch_set))
-  {
-    usage("--match --mismatch must both be set or neither set");
-  }
-  else if(substitutions_set && !match_set)
+  if(substitutions_set && !match_set)
   {
     // if substitution table set and not match/mismatch
     scoring->use_match_mismatch = 0;

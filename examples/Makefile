@@ -12,9 +12,6 @@ all: sw_example sw_cpp
 sw_example: sw_example.c ../src/libalign.a
 	$(CC) $< -o $@ $(CFLAGS) $(INCS) $(LIBS) $(LINK)
 
-sw_cpp: sw_example.cpp ../src/libalign.a
-	$(CXX) $< -o $@ $(CXXFLAGS) $(INCS) $(LIBS) $(LINK)
-
 clean:
 	rm -rf sw_example sw_cpp *.greg *.dSYM
 

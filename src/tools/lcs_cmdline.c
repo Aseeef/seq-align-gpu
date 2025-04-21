@@ -38,13 +38,10 @@ int main(int argc, char **argv)
   // Go
   int match = 1, mismatch = -1, gap_open = -4, gap_extend = -1;
 
-  bool no_gaps_in_a = true, no_gaps_in_b = true;
-  bool no_mismatches = true, case_sensitive = true;
+  bool case_sensitive = true;
 
   scoring_t scoring;
-  scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_gaps_in_a, no_gaps_in_b,
-               no_mismatches, case_sensitive);
+  scoring_init(&scoring, match, mismatch, gap_open, gap_extend, case_sensitive);
 
   // Alignment results stored here
   sw_aligner_t *sw = smith_waterman_new();

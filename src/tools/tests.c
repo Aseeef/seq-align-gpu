@@ -82,13 +82,10 @@ void sw_test_no_gaps_smith_waterman()
   int gap_open = -4;
   int gap_extend = -1;
 
-  bool no_gaps_in_a = true, no_gaps_in_b = true;
-  bool no_mismatches = false, case_sensitive = true;
+  bool case_sensitive = true;
 
   scoring_t scoring;
-  scoring_init(&scoring, match, mismatch, gap_open, gap_extend,
-               no_gaps_in_a, no_gaps_in_b,
-               no_mismatches, case_sensitive);
+  scoring_init(&scoring, match, mismatch, gap_open, gap_extend, case_sensitive);
 
   smith_waterman_align(seq_a, seq_b, &scoring, sw);
 
