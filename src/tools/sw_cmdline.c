@@ -44,22 +44,16 @@ static void sw_set_default_scoring() {
 }
 
 // Align two sequences against each other to find local alignments between them
-void align(const char *seq_a, const char *seq_b,
-           const char *seq_a_name, const char *seq_b_name) {
-    if ((seq_a_name != NULL || seq_b_name != NULL) && wait_on_keystroke) {
-        fprintf(stderr, "Error: Interactive input takes seq only "
-                        "(no FASTA/FASTQ) '%s:%s'\n", seq_a_name, seq_b_name);
-        fflush(stderr);
-        exit(EXIT_FAILURE);
-    }
+void align_batch(size_t batch_size, const char *seq_a, const char **seq_b_batch,
+           const char *seq_a_name, const char **seq_b_name_batch) {
 
-    // Check both arguments have length > 0
-    if (seq_a[0] == '\0' || seq_b[0] == '\0') {
-        fprintf(stderr, "Error: Sequences must have length > 0\n");
+    // Check query has length > 0
+    if (seq_a[0] == '\0') {
+        fprintf(stderr, "Error: The query must have length > 0\n");
         fflush(stderr);
 
-        if (cmd->print_fasta && seq_a_name != NULL && seq_b_name != NULL) {
-            fprintf(stderr, "%s\n%s\n", seq_a_name, seq_b_name);
+        if (cmd->print_fasta && seq_a_name != NULL) {
+            fprintf(stderr, "%s\n", seq_a_name);
         }
 
         fflush(stderr);
@@ -67,7 +61,21 @@ void align(const char *seq_a, const char *seq_b,
         return;
     }
 
-    smith_waterman_align(seq_a, seq_b, &scoring, sw);
+    // Check database entries have length > 0
+    for (size_t b = 0; b < batch_size; b++) {
+        if (seq_b_batch[b][0] == '\0') {
+            fprintf(stderr, "Error: The database entries must have length > 0\n");
+            fflush(stderr);
+            if (cmd->print_fasta && seq_b_name_batch[b] != NULL) {
+                fprintf(stderr, "%s\n", seq_b_name_batch[b]);
+            }
+
+            fflush(stderr);
+            return;
+        }
+    }
+
+    smith_waterman_align_batch(seq_a, seq_b_batch, batch_size, &scoring, sw);
 
     aligner_t *aligner = smith_waterman_get_aligner(sw);
     size_t len_a = aligner->score_width - 1, len_b = aligner->score_height - 1;
@@ -89,45 +97,30 @@ void align(const char *seq_a, const char *seq_b,
         putc('\n', stdout);
     }
 
-    // seqB
-    if (cmd->print_fasta && seq_b_name != NULL) {
-        fputs(seq_b_name, stdout);
+    for (size_t b = 0; b < batch_size; b++) {
+        // seqB
+        if (cmd->print_fasta && seq_b_name_batch[b] != NULL) {
+            fputs(seq_b_name_batch[b], stdout);
+            putc('\n', stdout);
+        }
+
+        if (cmd->print_seq) {
+            fputs(seq_b_name_batch[b], stdout);
+            putc('\n', stdout);
+        }
+
         putc('\n', stdout);
+
+        fflush(stdout);
+
+        printf("score: %i\n\n", aligner->max_scores[b]);
     }
-
-    if (cmd->print_seq) {
-        fputs(seq_b, stdout);
-        putc('\n', stdout);
-    }
-
-    putc('\n', stdout);
-
-    if (!cmd->min_score_set) {
-        // If min_score hasn't been set, set a limit based on the lengths of seqs
-        // or zero if we're running interactively
-        cmd->min_score = wait_on_keystroke ? 0
-                                           : scoring.match * MAX2(0.2 * MIN2(len_a, len_b), 2);
-
-#ifdef SEQ_ALIGN_VERBOSE
-        printf("min_score: %i\n", cmd->min_score);
-#endif
-    }
-
-    fflush(stdout);
-
-    printf("score: %i\n", aligner->max_score);
 
     fputs("==\n", stdout);
     fflush(stdout);
 
     // Increment sequence alignment counter
     alignment_index++;
-}
-
-void align_pair_from_file(read_t *read1, read_t *read2) {
-    align(read1->seq.b, read2->seq.b,
-          (read1->name.end == 0 ? NULL : read1->name.b),
-          (read2->name.end == 0 ? NULL : read2->name.b));
 }
 
 int main(int argc, char *argv[]) {
@@ -141,17 +134,12 @@ int main(int argc, char *argv[]) {
     // Align!
     sw = smith_waterman_new();
 
-    if (cmd->seq1 != NULL) {
-        // Align seq1 and seq2
-        align(cmd->seq1, cmd->seq2, NULL, NULL);
-    }
-
     // Align from files
     const char *query_file = cmdline_get_file1(cmd);
     const char *db_file = cmdline_get_file2(cmd);
 
     if (query_file != NULL && db_file != NULL) {
-        align_from_query_and_db(query_file, db_file, &align, !cmd->interactive);
+        align_from_query_and_db(query_file, db_file, &align_batch, !cmd->interactive);
     } else {
         fprintf(stderr, "Error: Both query and database files must be provided\n");
         fflush(stderr);

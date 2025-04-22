@@ -239,18 +239,6 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
 
         argi++; // took an argument
       }
-      else if(strcasecmp(argv[argi], "--minscore") == 0)
-      {
-        if(cmd_type != SEQ_ALIGN_SW_CMD)
-          usage("--minscore only valid with Smith-Waterman");
-
-        if(!parse_entire_int(argv[argi+1], &cmd->min_score))
-          usage("Invalid --minscore <score> argument (must be a +ve int)");
-
-        cmd->min_score_set = true;
-
-        argi++;
-      }
       else if(strcasecmp(argv[argi], "--maxhits") == 0)
       {
         if(cmd_type != SEQ_ALIGN_SW_CMD)
@@ -310,7 +298,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       // Remaining options take two arguments but check themselves
       else if(strcasecmp(argv[argi], "--files") == 0)
       {
-          printf("Adding %s and %s", argv[argi+1], argv[argi+2]);
+          printf("Query File=%s and Database File=%s\n", argv[argi+1], argv[argi+2]);
         if(argi >= argc-2)
         {
           usage("--files option takes 2 arguments");
@@ -385,9 +373,11 @@ static seq_file_t* open_seq_file(const char *path, bool use_zlib)
                                              : seq_dopen(fileno(stdin), false, false, 0);
 }
 
+#define BATCH_SIZE 32
+
 void align_from_query_and_db(const char *query_path, const char *db_path,
-                     void (align)(const char *query_seq, const char *db_seq,
-                                  const char *query_name, const char *db_name),
+                     void (align)(size_t batch_size, const char *query_seq, const char **db_seq_batch,
+                                  const char *query_name, const char **db_name),
                      bool use_zlib)
 {
     seq_file_t *query_file, *db_file;
@@ -427,11 +417,27 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
     read_t db_read;
     seq_read_alloc(&db_read);
 
+    char *db_seq_batch[BATCH_SIZE];
+    char *db_name_batch[BATCH_SIZE];
+    size_t batch_count = 0;
+
     while(seq_read(db_file, &db_read) > 0)
     {
-        align(query_read.seq.b, db_read.seq.b,
-              (query_read.name.end == 0 ? NULL : query_read.name.b),
-              (db_read.name.end == 0 ? NULL : db_read.name.b));
+        assert(db_read.name.end != 0);
+
+        db_seq_batch[batch_count] = strdup(db_read.seq.b);
+        db_name_batch[batch_count] = strdup(db_read.name.b);
+
+        batch_count++;
+
+        if(batch_count == BATCH_SIZE)
+        {
+            assert(query_read.name.end != 0);
+            align(BATCH_SIZE, query_read.seq.b, db_seq_batch,
+                  query_read.name.b,
+                  (const char **) db_name_batch);
+            batch_count = 0; // Reset batch count
+        }
     }
 
     // Close files and free memory
@@ -439,70 +445,4 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
     seq_close(db_file);
     seq_read_dealloc(&query_read);
     seq_read_dealloc(&db_read);
-}
-
-// If seq2 is NULL, read pair of entries from first file
-// Otherwise read an entry from each
-void align_from_file(const char *path1, const char *path2,
-                     void (align)(read_t *r1, read_t *r2),
-                     bool use_zlib)
-{
-  seq_file_t *sf1, *sf2;
-
-  if((sf1 = open_seq_file(path1, use_zlib)) == NULL)
-  {
-    fprintf(stderr, "Alignment Error: couldn't open file %s\n", path1);
-    fflush(stderr);
-    return;
-  }
-
-  if(path2 == NULL)
-  {
-    sf2 = sf1;
-  }
-  else if((sf2 = open_seq_file(path2, use_zlib)) == NULL)
-  {
-    fprintf(stderr, "Alignment Error: couldn't open file %s\n", path1);
-    fflush(stderr);
-    return;
-  }
-
-  // fprintf(stderr, "File buffer %zu zlib: %i\n", sf1->in.size, seq_use_gzip(sf1));
-
-  read_t read1, read2;
-  seq_read_alloc(&read1);
-  seq_read_alloc(&read2);
-
-  // Loop while we can read a sequence from the first file
-  unsigned long alignments;
-
-  for(alignments = 0; seq_read(sf1, &read1) > 0; alignments++)
-  {
-    if(seq_read(sf2, &read2) <= 0)
-    {
-      fprintf(stderr, "Alignment Error: Odd number of sequences - "
-                      "I read in pairs!\n");
-      fflush(stderr);
-      break;
-    }
-
-    (align)(&read1, &read2);
-  }
-
-  // warn if no bases read
-  if(alignments == 0)
-  {
-    fprintf(stderr, "Alignment Warning: empty input\n");
-    fflush(stderr);
-  }
-
-  // Close files
-  seq_close(sf1);
-
-  if(path2 != NULL)
-    seq_close(sf2);
-
-  // Free memory
-  seq_read_dealloc(&read1);
-  seq_read_dealloc(&read2);
 }

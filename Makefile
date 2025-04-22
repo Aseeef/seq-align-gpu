@@ -1,7 +1,9 @@
 LIBS_PATH=libs
 
+DEBUG=1
+
 ifdef DEBUG
-	OPT = -O0 --debug -g -ggdb
+	OPT = -O0 -g -ggdb
 else
 	OPT = -O3
 endif
@@ -18,7 +20,7 @@ LINK=-lalign -lstrbuf -lpthread -lz
 SRCS=$(wildcard src/*.c)
 OBJS=$(SRCS:.c=.o)
 
-all: bin/smith_waterman bin/lcs src/libalign.a examples
+all: bin/smith_waterman src/libalign.a
 
 # Build libraries only if they're downloaded
 src/libalign.a: $(OBJS)
@@ -29,14 +31,7 @@ src/libalign.a: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJFLAGS) $(INCS) -c $< -o $@
 
 bin/smith_waterman: src/tools/sw_cmdline.c src/libalign.a | bin
-	$(CC) -o bin/smith_waterman $(SRCS) $(TGTFLAGS) $(INCS) $(LIBS) src/tools/sw_cmdline.c $(LINKFLAGS)
-
-bin/lcs: src/tools/lcs_cmdline.c src/libalign.a | bin
-	$(CC) -o bin/lcs $(SRCS) $(TGTFLAGS) $(INCS) $(LIBS) src/tools/lcs_cmdline.c $(LINKFLAGS)
-
-bin/seq_align_tests: src/tools/tests.c src/libalign.a
-	mkdir -p bin
-	$(CC) -o $@ $< $(CFLAGS) $(INCS) $(LIBS) $(LINK)
+	$(CC) -o bin/smith_waterman $(SRCS) $(CFLAGS) $(TGTFLAGS) $(INCS) $(LIBS) src/tools/sw_cmdline.c $(LINKFLAGS)
 
 examples: src/libalign.a
 	cd examples; $(MAKE) LIBS_PATH=$(abspath $(LIBS_PATH))
@@ -51,7 +46,4 @@ clean:
 	rm -rf bin src/*.o src/libalign.a
 	cd examples && $(MAKE) clean
 
-test: bin/seq_align_tests
-	./bin/seq_align_tests
-
-.PHONY: all clean examples test
+.PHONY: all clean examples

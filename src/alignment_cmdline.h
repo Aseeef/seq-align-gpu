@@ -30,9 +30,8 @@ typedef struct
   int match, mismatch, gap_open, gap_extend;
 
   // SW specific
-  score_t min_score;
   unsigned int max_hits_per_alignment;
-  bool min_score_set, max_hits_per_alignment_set;
+  bool max_hits_per_alignment_set;
   bool print_seq;
 
   // NW specific?
@@ -61,8 +60,8 @@ char* cmdline_get_file2(cmdline_t* cmd);
 
 
 void align_from_query_and_db(const char *query_path, const char *db_path,
-                              void (align)(const char *query_seq, const char *db_seq,
-                                           const char *query_name, const char *db_name),
+                              void (align)(size_t batch_size, const char *query_seq, const char **db_seq_batch,
+                                           const char *query_name, const char **db_name),
                               bool use_zlib);
 
 #endif

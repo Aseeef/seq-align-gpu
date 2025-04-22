@@ -27,12 +27,8 @@ aligner_t* smith_waterman_get_aligner(sw_aligner_t *sw);
  Do not alter seq_a, seq_b or scoring whilst calling this method
  or between calls to smith_waterman_get_hit
 */
-void smith_waterman_align(const char *seq_a, const char *seq_b,
+void smith_waterman_align_batch(const char *seq_a, const char **seq_b_batch, size_t batch_size,
                           const scoring_t *scoring, sw_aligner_t *sw);
-
-void smith_waterman_align2(const char *seq_a, const char *seq_b,
-                           size_t len_a, size_t len_b,
-                           const scoring_t *scoring, sw_aligner_t *sw);
 
 #ifdef __cplusplus
 }

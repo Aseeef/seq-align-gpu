@@ -18,20 +18,17 @@
 #include "alignment.h"
 #include "alignment_macros.h"
 
-const char align_col_mismatch[] = "\033[92m"; // Mismatch (GREEN)
-const char align_col_indel[] = "\033[91m"; // Insertion / deletion (RED)
-const char align_col_stop[] = "\033[0m";
-
 // Fill in traceback matrix
-static void alignment_fill_matrices(aligner_t *aligner)
+static void alignment_fill_matrices(aligner_t * aligner)
 {
   score_t *match_scores = aligner->match_scores;
   score_t *gap_a_scores = aligner->gap_a_scores;
   score_t *gap_b_scores = aligner->gap_b_scores;
   const scoring_t *scoring = aligner->scoring;
+  score_t *max_scores = aligner->max_scores;
   size_t score_width = aligner->score_width;
   size_t score_height = aligner->score_height;
-  size_t i, j;
+  size_t i, j, b;
 
   int gap_open_penalty = scoring->gap_extend + scoring->gap_open;
   int gap_extend_penalty = scoring->gap_extend;
@@ -46,10 +43,14 @@ static void alignment_fill_matrices(aligner_t *aligner)
   gap_a_scores[0] = 0;
   gap_b_scores[0] = 0;
 
+  // reset match and gap matrices
   for(i = 1; i < score_width; i++)
       match_scores[i] = gap_a_scores[i] = gap_b_scores[i] = 0;
   for(j = 1, index = score_width; j < score_height; j++, index += score_width)
       match_scores[index] = gap_a_scores[index] = gap_b_scores[index] = min;
+  // reset match scores
+  for (b = 0; b < aligner->b_batch_size; b++)
+      max_scores[b] = min;
 
   // start at position [1][1]
   index_upleft = 0;
@@ -57,90 +58,89 @@ static void alignment_fill_matrices(aligner_t *aligner)
   index_left = score_width;
   index = score_width+1;
 
-  for(seq_j = 0; seq_j < len_j; seq_j++)
-  {
-    for(seq_i = 0; seq_i < len_i; seq_i++)
-    {
-      // Update match_scores[i][j] with position [i-1][j-1]
-      // substitution penalty
-      bool is_match;
-      int substitution_penalty;
+  for (b = 0; b < aligner->b_batch_size; b++) {
+      for (seq_j = 0; seq_j < len_j; seq_j++) {
+          for (seq_i = 0; seq_i < len_i; seq_i++) {
+              // Update match_scores[i][j] with position [i-1][j-1]
+              // substitution penalty
+              bool is_match;
+              int substitution_penalty;
 
-      scoring_lookup(scoring, aligner->seq_a[seq_i], aligner->seq_b[seq_j],
-                     &substitution_penalty, &is_match);
+              // todo: this is a double de-reference. This was a bad idea. Optimize later.
+              scoring_lookup(scoring, aligner->seq_a[seq_i], aligner->seq_b_batch[b][seq_j],
+                             &substitution_penalty, &is_match);
 
-      // substitution
-      // 1) continue alignment
-      // 2) close gap in seq_a
-      // 3) close gap in seq_b
-      score_t match_score = MAX4(match_scores[index_upleft] + substitution_penalty,
-                                  gap_a_scores[index_upleft] + substitution_penalty,
-                                  gap_b_scores[index_upleft] + substitution_penalty,
-                                  min);
-      match_scores[index] = match_score;
+              // substitution
+              // 1) continue alignment
+              // 2) close gap in seq_a
+              // 3) close gap in seq_b
+              score_t match_score = MAX4(match_scores[index_upleft] + substitution_penalty,
+                                         gap_a_scores[index_upleft] + substitution_penalty,
+                                         gap_b_scores[index_upleft] + substitution_penalty,
+                                         min);
+              match_scores[index] = match_score;
 
-      // update best score
-      if (aligner->max_score < match_score)
-          aligner->max_score = match_score;
+              // update best score
+              if (max_scores[b] < match_score)
+                  max_scores[b] = match_score;
 
-      // Long arithmetic since some INTs are set to min and penalty is -ve
-      // (adding as ints would cause an integer overflow)
+              // Long arithmetic since some INTs are set to min and penalty is -ve
+              // (adding as ints would cause an integer overflow)
 
-      // Update gap_a_scores[i][j] from position [i][j-1]
-      if(seq_i == len_i-1)
-      {
-        gap_a_scores[index]
-          = MAX4(match_scores[index_up] + gap_open_penalty,
-                 gap_a_scores[index_up] + gap_extend_penalty,
-                 gap_b_scores[index_up] + gap_open_penalty,
-                 min);
+              // Update gap_a_scores[i][j] from position [i][j-1]
+              if (seq_i == len_i - 1) {
+                  gap_a_scores[index]
+                          = MAX4(match_scores[index_up] + gap_open_penalty,
+                                 gap_a_scores[index_up] + gap_extend_penalty,
+                                 gap_b_scores[index_up] + gap_open_penalty,
+                                 min);
+              } else
+                  gap_a_scores[index] = min;
+
+              // Update gap_b_scores[i][j] from position [i-1][j]
+              if (seq_j == len_j - 1) {
+                  gap_b_scores[index]
+                          = MAX4(match_scores[index_left] + gap_open_penalty,
+                                 gap_a_scores[index_left] + gap_open_penalty,
+                                 gap_b_scores[index_left] + gap_extend_penalty,
+                                 min);
+              } else
+                  gap_b_scores[index] = min;
+
+              index++;
+              index_left++;
+              index_up++;
+              index_upleft++;
+          }
+
+          index++;
+          index_left++;
+          index_up++;
+          index_upleft++;
       }
-      else
-        gap_a_scores[index] = min;
-
-      // Update gap_b_scores[i][j] from position [i-1][j]
-      if(seq_j == len_j-1)
-      {
-        gap_b_scores[index]
-          = MAX4(match_scores[index_left] + gap_open_penalty,
-                 gap_a_scores[index_left] + gap_open_penalty,
-                 gap_b_scores[index_left] + gap_extend_penalty,
-                 min);
-      }
-      else
-        gap_b_scores[index] = min;
-
-      index++;
-      index_left++;
-      index_up++;
-      index_upleft++;
-    }
-
-    index++;
-    index_left++;
-    index_up++;
-    index_upleft++;
   }
 }
 
+// Note: len_b must be same for all batches
 void aligner_align(aligner_t *aligner,
-                   const char *seq_a, const char *seq_b,
-                   size_t len_a, size_t len_b,
+                   const char *seq_a, const char **seq_b_batch,
+                   size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring)
 {
   aligner->scoring = scoring;
   aligner->seq_a = seq_a;
-  aligner->seq_b = seq_b;
+  aligner->seq_b_batch = seq_b_batch;
+  aligner->b_batch_size = batch_size;
   aligner->score_width = len_a+1;
   aligner->score_height = len_b+1;
-  aligner->max_score = 0;
+
+  aligner->max_scores = realloc(aligner->max_scores, sizeof(score_t) * batch_size);
 
   size_t new_capacity = aligner->score_width * aligner->score_height;
-
   if(aligner->capacity < new_capacity)
   {
     aligner->capacity = ROUNDUP2POW(new_capacity);
-    size_t mem = sizeof(score_t) * aligner->capacity;
+    size_t mem = sizeof(score_t) * aligner->capacity * batch_size;
     aligner->match_scores = realloc(aligner->match_scores, mem);
     aligner->gap_a_scores = realloc(aligner->gap_a_scores, mem);
     aligner->gap_b_scores = realloc(aligner->gap_b_scores, mem);
@@ -208,52 +208,4 @@ void alignment_print_matrices(const aligner_t *aligner)
   printf("\n");
 }
 
-void alignment_colour_print_against(const char *alignment_a,
-                                    const char *alignment_b,
-                                    char case_sensitive)
-{
-  int i;
-  char red = 0, green = 0;
-
-  for(i = 0; alignment_a[i] != '\0'; i++)
-  {
-    if(alignment_b[i] == '-')
-    {
-      if(!red)
-      {
-        fputs(align_col_indel, stdout);
-        red = 1;
-      }
-    }
-    else if(red)
-    {
-      red = 0;
-      fputs(align_col_stop, stdout);
-    }
-
-    if(((case_sensitive && alignment_a[i] != alignment_b[i]) ||
-        (!case_sensitive && tolower(alignment_a[i]) != tolower(alignment_b[i]))) &&
-       alignment_a[i] != '-' && alignment_b[i] != '-')
-    {
-      if(!green)
-      {
-        fputs(align_col_mismatch, stdout);
-        green = 1;
-      }
-    }
-    else if(green)
-    {
-      green = 0;
-      fputs(align_col_stop, stdout);
-    }
-
-    putc(alignment_a[i], stdout);
-  }
-
-  if(green || red)
-  {
-    // Stop all colours
-    fputs(align_col_stop, stdout);
-  }
-}
 

@@ -38,19 +38,13 @@ void smith_waterman_free(sw_aligner_t *sw)
 
 aligner_t* smith_waterman_get_aligner(sw_aligner_t *sw)
 {
-  return &sw->aligner;
+    return &sw->aligner;
 }
 
-void smith_waterman_align(const char *a, const char *b,
-                          const scoring_t *scoring, sw_aligner_t *sw)
-{
-  smith_waterman_align2(a, b, strlen(a), strlen(b), scoring, sw);
-}
-
-void smith_waterman_align2(const char *a, const char *b,
-                           size_t len_a, size_t len_b,
-                           const scoring_t *scoring, sw_aligner_t *sw)
-{
-  aligner_t *aligner = &sw->aligner;
-  aligner_align(aligner, a, b, len_a, len_b, scoring);
+void smith_waterman_align_batch(const char *a, const char **b_batch, size_t batch_size, const scoring_t *scoring, sw_aligner_t *sw) {
+    printf("Aligning batch of size %zu\n", batch_size);
+    size_t len_A = strlen(a);
+    size_t len_B = strlen(b_batch[0]); // yes strings in all batches must be the same size
+    aligner_t *aligner = &sw->aligner;
+    aligner_align(aligner, a, b_batch, len_A, len_B, batch_size, scoring);
 }

@@ -24,12 +24,13 @@
 typedef struct
 {
     const scoring_t* scoring;     // Scoring scheme used (match/mismatch/gap)
-    const char *seq_a, *seq_b;    // Pointers to input sequences A and B
-    size_t score_width, score_height; // Matrix dimensions: width = len(seq_a)+1, height = len(seq_b)+1
+    const char *seq_a, **seq_b_batch;    // Pointers to input sequences A and B
+    size_t b_batch_size;                // the batch size of b
+    size_t score_width, score_height; // Matrix dimensions: width = len(seq_a)+1, height = len(seq_b_batch[i])+1
     score_t *match_scores;        // Full match/mismatch matrix (score for aligning A[i] with B[j])
     score_t *gap_a_scores;        // Matrix for gap penalties in sequence A (inserts in B)
     score_t *gap_b_scores;        // Matrix for gap penalties in sequence B (inserts in A)
-    score_t max_score;            // the max score of the best local alignment found
+    score_t *max_scores;            // the max score of the best local alignment found
     size_t capacity;              // Current allocated matrix size (score_width * score_height)
 } aligner_t;
 
@@ -38,10 +39,6 @@ typedef struct
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// Printing colour codes
-extern const char align_col_mismatch[], align_col_indel[],
-                  align_col_stop[];
 
 #define aligner_init(a) (memset(a, 0, sizeof(aligner_t)))
 
@@ -56,8 +53,8 @@ extern const char align_col_mismatch[], align_col_indel[],
  *   scoring   - pointer to scoring scheme (match/mismatch/gaps)
  */
 void aligner_align(aligner_t *aligner,
-                   const char *seq_a, const char *seq_b,
-                   size_t len_a, size_t len_b,
+                   const char *seq_a, const char **seq_b_batch,
+                   size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring);
 
 /**
