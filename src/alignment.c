@@ -91,10 +91,6 @@ static void alignment_fill_matrices(aligner_t * aligner)
           // substitution penalty
           __m256i substitution_penalty = scoring_lookup(scoring, batch_size, aligner->seq_a[seq_i], aligner->seq_b_batch + (seq_j*batch_size));
 
-          //int temp_test[8];
-          //_mm256_storeu_si256((__m256i *)temp_test, substitution_penalty);
-          //printf("%c-%c %d\n", aligner->seq_a[seq_i], aligner->seq_b_batch[(seq_j*batch_size) + 0], temp_test[0]);
-
           // 1) continue alignment
           // 2) close gap in seq_a
           // 3) close gap in seq_b
