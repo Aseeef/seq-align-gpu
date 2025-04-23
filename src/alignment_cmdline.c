@@ -373,10 +373,18 @@ static seq_file_t* open_seq_file(const char *path, bool use_zlib)
                                              : seq_dopen(fileno(stdin), false, false, 0);
 }
 
-#define BATCH_SIZE 32
+// 35213*12=422556
+// (35k is largest protein)
+// 12 is largest score you can get per match
+// so 422k is the largest score possible.
+// so I NEED AN INT
+// AVX can hold 32 bytes
+// ints are 4 bytes.
+// so we got 8 slots for the batch
+#define BATCH_SIZE 8
 
 void align_from_query_and_db(const char *query_path, const char *db_path,
-                     void (align)(size_t batch_size, const char *query_seq, const char **db_seq_batch,
+                     void (align)(size_t batch_size, char *query_seq, char *db_seq_batch, int seq_b_len,
                                   const char *query_name, const char **db_name),
                      bool use_zlib)
 {
@@ -417,15 +425,37 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
     read_t db_read;
     seq_read_alloc(&db_read);
 
-    char *db_seq_batch[BATCH_SIZE];
+    char *db_seq_batch = NULL;
     char *db_name_batch[BATCH_SIZE];
     size_t batch_count = 0;
+
+    bool len_set = false;
+    int db_seq_len = 0;
 
     while(seq_read(db_file, &db_read) > 0)
     {
         assert(db_read.name.end != 0);
 
-        db_seq_batch[batch_count] = strdup(db_read.seq.b);
+        char * seq_b = db_read.seq.b;
+
+        if (!len_set) {
+            db_seq_len = (int) strlen(seq_b);
+            len_set = true;
+            db_seq_batch = calloc(db_seq_len * BATCH_SIZE, sizeof(char));
+        } else {
+            // technically, this is not strictly needed.
+            // but to make reasoning about this application easier,
+            // ill definitely start with this. In order to allow
+            // other sequence lengths, we'd just need to do zero padding.
+            // and handle this in our code. Since in this version of the code
+            // we'd assume DB entries are sorted in order of longest seq length
+            // to shortest, our memory allocation approach should work fine
+            assert(db_seq_len == (int) strlen(seq_b));
+        }
+
+        for (size_t i = 0; i < db_seq_len; i++) {
+            db_seq_batch[i * BATCH_SIZE] = seq_b[i];
+        }
         db_name_batch[batch_count] = strdup(db_read.name.b);
 
         batch_count++;
@@ -433,10 +463,13 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
         if(batch_count == BATCH_SIZE)
         {
             assert(query_read.name.end != 0);
-            align(BATCH_SIZE, query_read.seq.b, db_seq_batch,
+            align(BATCH_SIZE, query_read.seq.b, db_seq_batch, db_seq_len,
                   query_read.name.b,
                   (const char **) db_name_batch);
             batch_count = 0; // Reset batch count
+            len_set = false;
+            free(db_seq_batch);
+            db_seq_batch = NULL;
         }
     }
 

@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h> // memset
 #include <ctype.h> // tolower
+#include <assert.h>
 
 #include "alignment_scoring.h"
 #include "alignment_macros.h"
@@ -64,66 +65,37 @@ void scoring_add_mutation(scoring_t *scoring, char a, char b, int score) {
 }
 
 /**
- * Checks if characters a or b are wildcards and fetches the associated score.
+ * Looks up the score for aligning characters a and a batch of b's and determines if they match.
  *
  * @param scoring          Pointer to the scoring_t structure.
- * @param a                First character to check for wildcard matching.
- * @param b                Second character to check for wildcard matching.
- * @param score            Pointer to store the score if wildcards match.
- * 
- * @return                 Returns 1 if either character is a wildcard, else 0.
+ * @param batch_size       The batch size
+ * @param a                Query character in the alignment.
+ * @param b_batch          DB batch of characters in the alignment
+ * @return                 The scores for aligning a and the batch of b's.
  */
-static char _scoring_check_wildcards(const scoring_t *scoring, char a, char b,
-                                     int *score) {
-    return 0;
-}
+__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, char a, char * b) {
+    // TODO: this method will probably be a bottleneck. Look into prefetching or ensuring
+    // the swap_set stays in memory
+    assert(batch_size == 8);
 
-/**
- * Looks up the score for aligning characters a and b and determines if they match.
- *
- * @param scoring          Pointer to the scoring_t structure.
- * @param a                First character in the alignment.
- * @param b                Second character in the alignment.
- * @param score            Pointer to store the score for aligning a and b.
- * @param is_match         Pointer to store whether a and b are considered a match.
- */
-void scoring_lookup(const scoring_t *scoring, char a, char b,
-                    int *score, bool *is_match) {
     if (!scoring->case_sensitive) {
         a = tolower(a);
-        b = tolower(b);
+        for (size_t i = 0; i < batch_size; i++) {
+            b[i] = tolower(b[i]);
+        }
     }
 
-    //#ifdef SEQ_ALIGN_VERBOSE
-    //printf(" scoring_lookup(%c,%c)\n", a, b);
-    //#endif
-
-    *is_match = (a == b);
-
-    // Look up in table
-    if (get_swap_bit(scoring, a, b)) {
-        *score = scoring->swap_scores[(size_t) a][(size_t) b];
-        return;
+    // compute the indices we are going to use to gather
+    int32_t indices[8];
+    int base = a * 256;
+    for (int i = 0; i < 8; ++i) {
+        indices[i] = base + b[i];
     }
+    __m256i idx = _mm256_loadu_si256((__m256i *)indices);
+    int * swap_scores = (int *) scoring->swap_scores;
+    __m256i scores = _mm256_i32gather_epi32(swap_scores, idx, 4);
 
-    // Check wildcards
-    // Wildcards are used in the order they are given
-    // e.g. if we specify '--wildcard X 2 --wildcard Y 3' X:Y align with score 2
-    if (_scoring_check_wildcards(scoring, a, b, score)) {
-        *is_match = 1;
-        return;
-    }
-
-    // Use match/mismatch
-    if (scoring->use_match_mismatch) {
-        *score = (*is_match ? scoring->match : scoring->mismatch);
-        return;
-    }
-
-    // Error
-    fprintf(stderr, "Error: Unknown character pair (%c,%c) and "
-                    "match/mismatch have not been set\n", a, b);
-    exit(EXIT_FAILURE);
+    return scores;
 }
 
 /**

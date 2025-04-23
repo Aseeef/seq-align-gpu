@@ -8,7 +8,7 @@ else
 	OPT = -O3
 endif
 
-CFLAGS = -Wall -Wextra -std=c99 $(OPT)
+CFLAGS = -Wall -Wextra -mavx2 -march=native -std=c11 $(OPT)
 OBJFLAGS = -fPIC
 LINKFLAGS = -lalign -lstrbuf -lpthread -lz
 
@@ -30,8 +30,11 @@ src/libalign.a: $(OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(OBJFLAGS) $(INCS) -c $< -o $@
 
-bin/smith_waterman: src/tools/sw_cmdline.c src/libalign.a | bin
-	$(CC) -o bin/smith_waterman $(SRCS) $(CFLAGS) $(TGTFLAGS) $(INCS) $(LIBS) src/tools/sw_cmdline.c $(LINKFLAGS)
+bin/smith_waterman: src/tools/sw_cmdline.o src/libalign.a | bin
+	$(CC) $(CFLAGS) $(OBJFLAGS) -o bin/smith_waterman src/tools/sw_cmdline.o $(OBJS) $(LIBS) $(LINKFLAGS)
+
+src/tools/sw_cmdline.o: src/tools/sw_cmdline.c
+	$(CC) $(CFLAGS) $(OBJFLAGS) $(INCS) -c $< -o $@
 
 examples: src/libalign.a
 	cd examples; $(MAKE) LIBS_PATH=$(abspath $(LIBS_PATH))

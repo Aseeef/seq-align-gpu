@@ -11,9 +11,10 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <x86intrin.h>
 #include <limits.h> // INT_MIN
 
-typedef int score_t;
+typedef int32_t score_t;
 #define SCORE_MIN INT_MIN
 
 typedef struct
@@ -53,8 +54,7 @@ void scoring_init(scoring_t* scoring, int match, int mismatch,
 
 void scoring_add_mutation(scoring_t* scoring, char a, char b, int score);
 
-void scoring_lookup(const scoring_t* scoring, char a, char b,
-                    int *score, bool *is_match);
+__m256i scoring_lookup(const scoring_t* scoring, size_t batch_size, char a, char * b);
 
 // Some scoring systems
 void scoring_system_default(scoring_t *scoring); // DNA/RNA default
