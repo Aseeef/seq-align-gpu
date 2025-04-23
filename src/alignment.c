@@ -85,6 +85,7 @@ static void alignment_fill_matrices(aligner_t * aligner)
    * int index = (h * width + w) * batch_size;
    */
   for (seq_j = 0; seq_j < len_j; seq_j++) {
+
       for (seq_i = 0; seq_i < len_i; seq_i++) {
 
           // substitution penalty
@@ -175,12 +176,15 @@ static void alignment_fill_matrices(aligner_t * aligner)
           index_up += batch_size;
           index_upleft += batch_size;
       }
-
+      // need to increment again to make everyone
+      // get to the next row
       index += batch_size;
       index_left += batch_size;
       index_up += batch_size;
       index_upleft += batch_size;
   }
+
+    //printf("Matrix Index [3][2] = %d\n", match_scores[ARR_3D_index(score_width, batch_size, 3, 2, 7)]);
 
   // put back the max scores in this batch
   assert(aligner->match_scores != NULL);
@@ -241,11 +245,11 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
   // used to debug. So I rather not refactor it...
   for (b = 0 ; b < batch_size; b++) {
 
-      printf("(batch index: %zi/%zi, seq_a: %.*s\nseq_b: ",
-             b, batch_size,
+      printf("(batch no: %zi/%zi, seq_a: %.*s\nseq_b: ",
+             b + 1, batch_size,
              (int)aligner->score_width-1, aligner->seq_a);
       for (j = 0; j < aligner->score_height - 1; j++) {
-          printf("%c", aligner->seq_b_batch[batch_size * j]);
+          printf("%c", aligner->seq_b_batch[batch_size * j + b]);
       }
       printf("\n");
 
@@ -266,7 +270,7 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
           printf("%3i:", (int)j);
           for(i = 0; i < aligner->score_width; i++)
           {
-              printf("\t%3i", (int) gap_a_scores[ARR_3D_index(aligner->score_width, batch_size, i, j, b)]);
+              printf("\t%3i", (int) gap_a_scores[ARR_3D_index(aligner->score_width, batch_size, j, i, b)]);
           }
           putc('\n', stdout);
       }
@@ -276,7 +280,7 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
           printf("%3i:", (int)j);
           for(i = 0; i < aligner->score_width; i++)
           {
-              printf("\t%3i", (int) gap_b_scores[ARR_3D_index(aligner->score_width, batch_size, i, j, b)]);
+              printf("\t%3i", (int) gap_b_scores[ARR_3D_index(aligner->score_width, batch_size, j, i, b)]);
           }
           putc('\n', stdout);
       }
