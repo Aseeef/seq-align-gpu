@@ -88,7 +88,9 @@ __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, char a, char
     // compute the indices we are going to use to gather
     int32_t indices[8];
     int base = a * 256;
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < (int) batch_size; i++) {
+        // todo: the way i ordered the batch doesnt even help much.. revert
+        //  its causing too many problems...
         indices[i] = base + b[i];
     }
     __m256i idx = _mm256_loadu_si256((__m256i *)indices);

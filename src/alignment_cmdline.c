@@ -453,8 +453,8 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
             assert(db_seq_len == (int) strlen(seq_b));
         }
 
-        for (size_t i = 0; i < db_seq_len; i++) {
-            db_seq_batch[i * BATCH_SIZE] = seq_b[i];
+        for (int i = 0; i < db_seq_len; i++) {
+            db_seq_batch[i * BATCH_SIZE + batch_count] = seq_b[i];
         }
         db_name_batch[batch_count] = strdup(db_read.name.b);
 
