@@ -8,9 +8,9 @@ else
 	OPT = -O3
 endif
 
-CFLAGS = -Wall -Wextra -std=c99 $(OPT)
+CFLAGS = -Wall -Wextra -march=native -std=c11 $(OPT)
 OBJFLAGS = -fPIC
-LINKFLAGS = -lalign -lstrbuf -lpthread -lz
+LINKFLAGS = -fopenmp -mavx2 -lalign -lstrbuf -lpthread -lz
 
 INCS=-I $(LIBS_PATH) -I src
 LIBS=-L $(LIBS_PATH)/string_buffer -L src

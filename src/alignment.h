@@ -24,7 +24,7 @@
 typedef struct
 {
     const scoring_t* scoring;     // Scoring scheme used (match/mismatch/gap)
-    const char *seq_a, **seq_b_batch;    // Pointers to input sequences A and B
+    char *seq_a, *seq_b_batch;    // Pointers to input sequences A and B
     size_t b_batch_size;                // the batch size of b
     size_t score_width, score_height; // Matrix dimensions: width = len(seq_a)+1, height = len(seq_b_batch[i])+1
     score_t *match_scores;        // Full match/mismatch matrix (score for aligning A[i] with B[j])
@@ -53,7 +53,7 @@ extern "C" {
  *   scoring   - pointer to scoring scheme (match/mismatch/gaps)
  */
 void aligner_align(aligner_t *aligner,
-                   const char *seq_a, const char **seq_b_batch,
+                   char *seq_a, char *seq_b_batch,
                    size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring);
 
@@ -63,7 +63,7 @@ void aligner_align(aligner_t *aligner,
 void aligner_destroy(aligner_t *aligner);
 
 // Printing
-void alignment_print_matrices(const aligner_t *aligner);
+void alignment_print_matrices(const aligner_t *aligner, size_t batch_size);
 
 #ifdef __cplusplus
 }

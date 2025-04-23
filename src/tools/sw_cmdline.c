@@ -44,7 +44,7 @@ static void sw_set_default_scoring() {
 }
 
 // Align two sequences against each other to find local alignments between them
-void align_batch(size_t batch_size, const char *seq_a, const char **seq_b_batch,
+void align_batch(size_t batch_size, char *seq_a, char *seq_b_batch, int seq_b_len,
            const char *seq_a_name, const char **seq_b_name_batch) {
 
     // Check query has length > 0
@@ -61,21 +61,7 @@ void align_batch(size_t batch_size, const char *seq_a, const char **seq_b_batch,
         return;
     }
 
-    // Check database entries have length > 0
-    for (size_t b = 0; b < batch_size; b++) {
-        if (seq_b_batch[b][0] == '\0') {
-            fprintf(stderr, "Error: The database entries must have length > 0\n");
-            fflush(stderr);
-            if (cmd->print_fasta && seq_b_name_batch[b] != NULL) {
-                fprintf(stderr, "%s\n", seq_b_name_batch[b]);
-            }
-
-            fflush(stderr);
-            return;
-        }
-    }
-
-    smith_waterman_align_batch(seq_a, seq_b_batch, batch_size, &scoring, sw);
+    smith_waterman_align_batch(seq_a, seq_b_batch, seq_b_len, batch_size, &scoring, sw);
 
     aligner_t *aligner = smith_waterman_get_aligner(sw);
     size_t len_a = aligner->score_width - 1, len_b = aligner->score_height - 1;
@@ -83,7 +69,7 @@ void align_batch(size_t batch_size, const char *seq_a, const char **seq_b_batch,
     printf("== Alignment %zu lengths (%lu, %lu):\n", alignment_index, len_a, len_b);
 
     if (cmd->print_matrices) {
-        alignment_print_matrices(aligner);
+        alignment_print_matrices(aligner, batch_size);
     }
 
     // seqA
@@ -96,6 +82,8 @@ void align_batch(size_t batch_size, const char *seq_a, const char **seq_b_batch,
         fputs(seq_a, stdout);
         putc('\n', stdout);
     }
+
+    printf("------\n");
 
     for (size_t b = 0; b < batch_size; b++) {
         // seqB

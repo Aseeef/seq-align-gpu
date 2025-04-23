@@ -60,8 +60,8 @@ char* cmdline_get_file2(cmdline_t* cmd);
 
 
 void align_from_query_and_db(const char *query_path, const char *db_path,
-                              void (align)(size_t batch_size, const char *query_seq, const char **db_seq_batch,
-                                           const char *query_name, const char **db_name),
+                              void (align)(size_t batch_size, char *query_seq, char *db_seq_batch,
+                              int seq_b_len, const char *query_name, const char **db_name),
                               bool use_zlib);
 
 #endif
