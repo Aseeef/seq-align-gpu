@@ -470,6 +470,9 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
             len_set = false;
             free(db_seq_batch);
             db_seq_batch = NULL;
+            // TODO REMOVE
+
+            exit(1);
         }
     }
 

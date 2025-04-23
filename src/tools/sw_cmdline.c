@@ -83,6 +83,8 @@ void align_batch(size_t batch_size, char *seq_a, char *seq_b_batch, int seq_b_le
         putc('\n', stdout);
     }
 
+    printf("------\n");
+
     for (size_t b = 0; b < batch_size; b++) {
         // seqB
         if (cmd->print_fasta && seq_b_name_batch[b] != NULL) {

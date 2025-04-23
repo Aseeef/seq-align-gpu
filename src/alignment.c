@@ -69,9 +69,9 @@ static void alignment_fill_matrices(aligner_t * aligner)
 
   // start at position [1][1]
   index_upleft = 0;
-  index_up = 1;
-  index_left = score_width;
-  index = score_width+1;
+  index_up = batch_size;
+  index_left = score_width*batch_size;
+  index = (score_width*batch_size)+batch_size;
 
   // todo: Later I can refactor the loops again and combine with OMP to do parallel anti-diagonal wavefront
   //  calculation. First step with the OMP would be to refactor using naive wavefront. Then combine it with
@@ -185,12 +185,12 @@ void aligner_align(aligner_t *aligner,
   aligner->seq_a = seq_a;
   aligner->seq_b_batch = seq_b_batch;
   aligner->b_batch_size = batch_size;
-  aligner->score_width = len_a+1;
+  aligner->score_width = len_a+1; // for the /0 character +1 (i think)
   aligner->score_height = len_b+1;
 
   // we are making the assumption that we will be using the same score_height and score_width throughout
   // the execution of the program. If time allows, we can fix this later.
-  assert(aligner->capacity == 0 || aligner->score_width * aligner->score_height == aligner->capacity);
+  assert(aligner->capacity == 0 || ROUNDUP2POW(aligner->score_width * aligner->score_height) == aligner->capacity);
 
   if(aligner->max_scores == NULL)
   {
