@@ -78,10 +78,12 @@ __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, char a, char
     // the swap_set stays in memory
     assert(batch_size == 8);
 
+    // TODO: this can be made more efficient somehow
+    char tmp[8];
     if (!scoring->case_sensitive) {
         a = tolower(a);
         for (size_t i = 0; i < batch_size; i++) {
-            b[i] = tolower(b[i]);
+            tmp[i] = tolower(b[i]);
         }
     }
 
@@ -90,8 +92,8 @@ __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, char a, char
     int base = a * 256;
     for (int i = 0; i < (int) batch_size; i++) {
         // todo: the way i ordered the batch doesnt even help much.. revert
-        //  its causing too many problems...
-        indices[i] = base + b[i];
+        //   its causing too many problems...
+        indices[i] = base + tmp[i];
     }
     __m256i idx = _mm256_loadu_si256((__m256i *)indices);
     int * swap_scores = (int *) scoring->swap_scores;
