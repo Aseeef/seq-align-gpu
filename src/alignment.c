@@ -38,14 +38,14 @@ static void alignment_fill_matrices(aligner_t * aligner)
 
   // possible to do batch sizes less than 8 by padding. Not gonna bother atm.
   assert(batch_size == 8);
+  // null checks
+  assert(match_scores != NULL);
+  assert(gap_a_scores != NULL);
+  assert(gap_b_scores != NULL);
+  assert(scoring != NULL);
 
   size_t seq_i, seq_j, len_i = score_width-1, len_j = score_height-1;
   size_t index, index_left, index_up, index_upleft;
-
-//  // [0][0]
-//  match_scores[0] = 0;
-//  gap_a_scores[0] = 0;
-//  gap_b_scores[0] = 0;
 
   // reset match scores
   __m256i max_scores_vec = _mm256_setzero_si256();
@@ -101,16 +101,9 @@ static void alignment_fill_matrices(aligner_t * aligner)
 //                                     gap_b_scores[index_upleft] + substitution_penalty,
 //                                     min);
 
-            //if (seq_i == 3 && seq_j == 0)
-            //    printf("temp_test[0]: %d\n", temp_test[0]);
-
           __m256i match_score = _mm256_load_si256((__m256i *)(match_scores + index_upleft));
           match_score = _mm256_add_epi32(match_score, substitution_penalty);
-          if (seq_i == 0 && seq_j == 0) {
-              int test[8];
-              _mm256_storeu_si256((__m256i *)test, match_score);
-              //printf("match_score: %d\n", test[0]);
-          }
+
           __m256i gap_a_score = _mm256_load_si256((__m256i *)(gap_a_scores + index_upleft));
           gap_a_score = _mm256_add_epi32(gap_a_score, substitution_penalty);
           __m256i gap_b_score = _mm256_load_si256((__m256i *)(gap_b_scores + index_upleft));
@@ -120,9 +113,7 @@ static void alignment_fill_matrices(aligner_t * aligner)
           __m256i max_mab = _mm256_max_epi32(match_score, max_ab);
           match_score = _mm256_max_epi32(max_mab, min_v);
 
-
-          // set max score. Equal to the original serial:
-          // todo: maybe? IDK double check. The +index is a bit sus.)
+          // save
           _mm256_store_si256((__m256i *)(match_scores + index), match_score);
 
           // update best score
