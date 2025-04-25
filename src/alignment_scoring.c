@@ -99,8 +99,7 @@ char index_to_letters(int c) {
  * @param b_batch          DB batch of characters in the alignment
  * @return                 The scores for aligning a and the batch of b's.
  */
-__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, score_t a_index, score_t * b_indexes) {
-    // TODO: this method will probably be a bottleneck. Look into prefetching.
+static __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, score_t a_index, score_t * b_indexes) {
     assert(batch_size == 8);
 
     // compute the indices we are going to use to gather

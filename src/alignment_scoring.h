@@ -56,7 +56,7 @@ int letters_to_index(char c);
 
 char index_to_letters(int c);
 
-__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, int a_index, int * b_indexes);
+static __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, int a_index, int * b_indexes);
 
 // Some scoring systems
 void scoring_system_default(scoring_t *scoring); // DNA/RNA default

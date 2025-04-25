@@ -85,12 +85,29 @@ static void alignment_fill_matrices(aligner_t * aligner)
   //  the cores across different database entries resulting in better L1/L2 cache utilization. Another thing I need to
   //  watch out for with OpenMP is false sharing. Something to think about later.
 
-  /*
-   * int index = (h * width + w) * batch_size;
-   */
+  size_t next_a_index;
+  // int index = (h * width + w) * batch_size;
   for (seq_j = 0; seq_j < len_j; seq_j++) {
 
       for (seq_i = 0; seq_i < len_i; seq_i++) {
+
+          if (seq_i + 2 < len_i && seq_i % 2 == 0) {
+              next_a_index = aligner->seq_a_indexes[seq_i + 1];
+          } else if (seq_j + 1 < len_j) {
+              next_a_index = aligner->seq_a_indexes[0];
+          }
+          // Calculate the address of the start of the 128-byte block for the future a_index
+          char const* prefetch_addr = (char const*)(scoring->swap_scores + next_a_index * 32);
+          // I need the next 256 bytes for the next loop -> 25%
+          // Lets prefetch next two loops -> 14%
+          _mm_prefetch(prefetch_addr, _MM_HINT_T0);          // Prefetch bytes 0–63
+          _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);     // Prefetch bytes 64–127
+          _mm_prefetch(prefetch_addr + 128, _MM_HINT_T0);    // Prefetch bytes 128–191
+          _mm_prefetch(prefetch_addr + 192, _MM_HINT_T0);    // Prefetch bytes 192–255
+          _mm_prefetch(prefetch_addr + 256, _MM_HINT_T0);          // Prefetch bytes 0–63
+          _mm_prefetch(prefetch_addr + 320, _MM_HINT_T0);     // Prefetch bytes 64–127
+          _mm_prefetch(prefetch_addr + 384, _MM_HINT_T0);    // Prefetch bytes 128–191
+          _mm_prefetch(prefetch_addr + 448, _MM_HINT_T0);    // Prefetch bytes 192–255
 
           // substitution penalty
           __m256i substitution_penalty = scoring_lookup(scoring, batch_size, aligner->seq_a_indexes[seq_i], aligner->seq_b_batch_indexes + (seq_j*batch_size));
@@ -200,7 +217,7 @@ void aligner_align(aligner_t *aligner,
 
   // The first allocation is expected to be the largest width*height.
   assert(aligner->capacity == 0 || ROUNDUP2POW(aligner->score_width * aligner->score_height) <= aligner->capacity);
-  
+
   if(aligner->max_scores == NULL)
   {
     size_t capacity = ROUNDUP2POW(aligner->score_width * aligner->score_height);
