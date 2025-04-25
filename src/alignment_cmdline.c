@@ -101,6 +101,7 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 "    --gapopen <score>    [default: %i]\n"
 "    --gapextend <score>  [default: %i]\n"
 "\n"
+// TODO: worth refractoring to ensure ppl always pass in what i want
 "    --substitution_matrix <file>  see details for formatting\n\n",
           defaults[0], defaults[1],
           defaults[2], defaults[3]);
@@ -430,7 +431,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
     size_t batch_count = 0;
 
     bool len_set = false;
-    int db_seq_len = 0;
+    int batch_max_len = 0;
 
     while(seq_read(db_file, &db_read) > 0)
     {
@@ -438,10 +439,11 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
 
         char * seq_b = db_read.seq.b;
 
+        int seq_b_len = (int) strlen(seq_b);
         if (!len_set) {
-            db_seq_len = (int) strlen(seq_b);
             len_set = true;
-            db_seq_batch = calloc(db_seq_len * BATCH_SIZE, sizeof(char));
+            batch_max_len = seq_b_len;
+            db_seq_batch = calloc(batch_max_len * BATCH_SIZE, sizeof(char));
         } else {
             // technically, this is not strictly needed.
             // but to make reasoning about this application easier,
@@ -450,11 +452,14 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
             // and handle this in our code. Since in this version of the code
             // we'd assume DB entries are sorted in order of longest seq length
             // to shortest, our memory allocation approach should work fine
-            assert(db_seq_len == (int) strlen(seq_b));
+            //assert(db_seq_len == (int) strlen(seq_b));
         }
 
-        for (int i = 0; i < db_seq_len; i++) {
+        for (int i = 0; i < seq_b_len; i++) {
             db_seq_batch[i * BATCH_SIZE + batch_count] = seq_b[i];
+        }
+        for (int i = seq_b_len; i < batch_max_len; i++) {
+            db_seq_batch[i * BATCH_SIZE + batch_count] = '*';
         }
         db_name_batch[batch_count] = strdup(db_read.name.b);
 
@@ -463,14 +468,15 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
         if(batch_count == BATCH_SIZE)
         {
             assert(query_read.name.end != 0);
-            align(BATCH_SIZE, query_read.seq.b, db_seq_batch, db_seq_len,
+            align(BATCH_SIZE, query_read.seq.b, db_seq_batch, batch_max_len,
                   query_read.name.b,
                   (const char **) db_name_batch);
-            batch_count = 0; // Reset batch count
+            // reset variables for the next batch
+            batch_count = 0;
             len_set = false;
             free(db_seq_batch);
             db_seq_batch = NULL;
-
+            batch_max_len = 0;
         }
     }
 

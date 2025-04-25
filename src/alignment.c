@@ -36,6 +36,7 @@ static void alignment_fill_matrices(aligner_t * aligner)
 
   const size_t batch_size = aligner->b_batch_size;
 
+  // todo: i also wanna test 8-byte alignments
   // possible to do batch sizes less than 8 by padding. Not gonna bother atm.
   assert(batch_size == 8);
   // null checks
@@ -73,9 +74,12 @@ static void alignment_fill_matrices(aligner_t * aligner)
   index_left = score_width*batch_size;
   index = (score_width*batch_size)+batch_size;
 
-  // todo: Later I can refactor the loops again and combine with OMP to do parallel anti-diagonal wavefront
+  // todo: Refactor the loops and combine with OMP to do parallel anti-diagonal wavefront
   //  calculation. First step with the OMP would be to refactor using naive wavefront. Then combine it with
-  //  wavefront + possibly blocking using strips (limiting the number of rows being operated on for cache friendliness).
+  //  wavefront + possibly blocking using strips (limiting the number of rows being operated on for cache friendliness
+  //  since).
+  //  Actually one thing I have to remember is vectors are 256-bits (32 bytes), and cache line is 512 bits (64 bytes).
+  //  So anytime I hit cache I'm actually grabbing two vectors.
   //  Number of rows should be AT LEAST as must as number of cores to fully utilize CPU. Works out for me since
   //  CPUs with larger core counts tend to have larger cache. This is not as good as Reza's implementation since he split
   //  the cores across different database entries resulting in better L1/L2 cache utilization. Another thing I need to
@@ -191,10 +195,9 @@ void aligner_align(aligner_t *aligner,
   aligner->score_width = len_a+1; // for col of all zeros
   aligner->score_height = len_b+1; // for the row of all zeros
 
-  // we are making the assumption that we will be using the same score_height and score_width throughout
-  // the execution of the program. If time allows, we can fix this later.
-  assert(aligner->capacity == 0 || ROUNDUP2POW(aligner->score_width * aligner->score_height) == aligner->capacity);
-
+  // The first allocation is expected to be the largest width*height.
+  assert(aligner->capacity == 0 || ROUNDUP2POW(aligner->score_width * aligner->score_height) <= aligner->capacity);
+  
   if(aligner->max_scores == NULL)
   {
     size_t capacity = ROUNDUP2POW(aligner->score_width * aligner->score_height);
