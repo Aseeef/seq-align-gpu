@@ -62,7 +62,7 @@ void scoring_add_mutation(scoring_t *scoring, char a, char b, int score) {
     size_t index_a = letters_to_index(a);
     size_t index_b = letters_to_index(b);
     scoring->swap_scores[index_a][index_b] = score;
-    set_swap_bit(scoring, a, b);
+    set_swap_bit(scoring, index_a, index_b);
     scoring->min_penalty = MIN2(scoring->min_penalty, score);
     scoring->max_penalty = MAX2(scoring->max_penalty, score);
 }
@@ -100,8 +100,7 @@ char index_to_letters(int c) {
  * @return                 The scores for aligning a and the batch of b's.
  */
 __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, score_t a_index, score_t * b_indexes) {
-    // TODO: this method will probably be a bottleneck. Look into prefetching or ensuring
-    //  the swap_set stays in memory
+    // TODO: this method will probably be a bottleneck. Look into prefetching.
     assert(batch_size == 8);
 
     // compute the indices we are going to use to gather

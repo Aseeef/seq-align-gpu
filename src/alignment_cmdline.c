@@ -429,9 +429,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     // characters are converted into indexes for table lookup
     score_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int));
 
-    set_swap_bit(scoring, 4, 4);
-    assert(get_swap_bit(scoring, 4, 4));
-
     // Replace unknown characters in query with an X
     for(i = 0; i < query_seq_len; i++) {
         query_indexes[i] = letters_to_index(query_seq[i]);
