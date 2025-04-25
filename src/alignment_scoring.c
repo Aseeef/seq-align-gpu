@@ -79,8 +79,8 @@ __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, char a, char
     //  the swap_set stays in memory
     assert(batch_size == 8);
 
-    // TODO: this can be made more efficient somehow
-    char tmp[8];
+    // TODO: this can be made more efficient. calculate ONCE.
+    alignas(32) int tmp[8];
     if (!scoring->case_sensitive) {
         a = tolower(a);
         for (size_t i = 0; i < batch_size; i++) {
