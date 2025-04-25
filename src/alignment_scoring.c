@@ -14,6 +14,7 @@
 #include <string.h> // memset
 #include <ctype.h> // tolower
 #include <assert.h>
+#include <stdalign.h>
 
 #include "alignment_scoring.h"
 #include "alignment_macros.h"
