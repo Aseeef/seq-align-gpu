@@ -41,9 +41,12 @@ aligner_t* smith_waterman_get_aligner(sw_aligner_t *sw)
     return &sw->aligner;
 }
 
-void smith_waterman_align_batch(char *a, char *b_batch, size_t seq_b_len, size_t batch_size, const scoring_t *scoring, sw_aligner_t *sw) {
-    printf("Aligning batch of size %zu\n", batch_size);
-    size_t len_A = strlen(a);
+void smith_waterman_align_batch(char *seq_a, char **seq_b_batch,
+                                score_t * seq_a_indexes, score_t * seq_b_batch_indexes,
+                                size_t seq_b_max_batch_len, size_t batch_size,
+                                const scoring_t *scoring, sw_aligner_t *sw) {
+    printf("Aligning batch of size %zu (max str size=%zu)\n", batch_size, seq_b_max_batch_len);
+    size_t len_A = strlen(seq_a);
     aligner_t *aligner = &sw->aligner;
-    aligner_align(aligner, a, b_batch, len_A, seq_b_len, batch_size, scoring);
+    aligner_align(aligner, seq_a, seq_b_batch, seq_a_indexes,  seq_b_batch_indexes, len_A, seq_b_max_batch_len, batch_size, scoring);
 }

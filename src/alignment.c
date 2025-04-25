@@ -93,7 +93,7 @@ static void alignment_fill_matrices(aligner_t * aligner)
       for (seq_i = 0; seq_i < len_i; seq_i++) {
 
           // substitution penalty
-          __m256i substitution_penalty = scoring_lookup(scoring, batch_size, aligner->seq_a[seq_i], aligner->seq_b_batch + (seq_j*batch_size));
+          __m256i substitution_penalty = scoring_lookup(scoring, batch_size, aligner->seq_a_indexes[seq_i], aligner->seq_b_batch_indexes + (seq_j*batch_size));
 
           // 1) continue alignment
           // 2) close gap in seq_a
@@ -184,13 +184,16 @@ static void alignment_fill_matrices(aligner_t * aligner)
 
 // Note: len_b must be same for all batches
 void aligner_align(aligner_t *aligner,
-                   char *seq_a, char *seq_b_batch,
+                   char *seq_a, char **seq_b_batch,
+                   score_t * seq_a_indexes, score_t * seq_b_batch_indexes,
                    size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring)
 {
   aligner->scoring = scoring;
-  aligner->seq_a = seq_a;
-  aligner->seq_b_batch = seq_b_batch;
+  aligner->seq_a_str = seq_a;
+  aligner->seq_b_str_batch = seq_b_batch;
+  aligner->seq_a_indexes = seq_a_indexes;
+  aligner->seq_b_batch_indexes = seq_b_batch_indexes;
   aligner->b_batch_size = batch_size;
   aligner->score_width = len_a+1; // for col of all zeros
   aligner->score_height = len_b+1; // for the row of all zeros
@@ -235,12 +238,11 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
   // used to debug. So I rather not refactor it...
   for (b = 0 ; b < batch_size; b++) {
 
-      printf("(batch no: %zi/%zi, seq_a: %.*s\nseq_b: ",
+      printf("(batch no: %zi/%zi, seq_a: %.*s\nseq_b: %.*s\n",
              b + 1, batch_size,
-             (int)aligner->score_width-1, aligner->seq_a);
-      for (j = 0; j < aligner->score_height - 1; j++) {
-          printf("%c", aligner->seq_b_batch[batch_size * j + b]);
-      }
+             (int)aligner->score_width-1, aligner->seq_a_str,
+             strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
+
       printf("\n");
 
       printf("match_scores:\n");

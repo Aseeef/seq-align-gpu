@@ -59,10 +59,35 @@ void scoring_init(scoring_t *scoring,
  * @param score            Score for the mutation (alignment between a and b).
  */
 void scoring_add_mutation(scoring_t *scoring, char a, char b, int score) {
-    scoring->swap_scores[(size_t) a][(size_t) b] = score;
+    size_t index_a = letters_to_index(a);
+    size_t index_b = letters_to_index(b);
+    scoring->swap_scores[index_a][index_b] = score;
     set_swap_bit(scoring, a, b);
     scoring->min_penalty = MIN2(scoring->min_penalty, score);
     scoring->max_penalty = MAX2(scoring->max_penalty, score);
+}
+
+int letters_to_index(char c) {
+    if (c >= 97 && c < 123) {
+        return c - 96;
+    } else if (c >= 65 && c < 91) {
+        return c - 64;
+    } else if (c == 42) {
+        return 31;
+    } else {
+        printf("Error: %c is not a legal character for the substitution matrix!\n", c);
+        exit(1);
+    }
+}
+
+char index_to_letters(int c) {
+    if (c >= 1 && c < 27) {
+        return c + 65;
+    } else if (c == 31) {
+        return '*';
+    } else {
+        printf("Error: %d is not a legal index for the substitution matrix!\n", c);
+    }
 }
 
 /**
@@ -74,35 +99,16 @@ void scoring_add_mutation(scoring_t *scoring, char a, char b, int score) {
  * @param b_batch          DB batch of characters in the alignment
  * @return                 The scores for aligning a and the batch of b's.
  */
-__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, char a, char * b) {
+__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, score_t a_index, score_t * b_indexes) {
     // TODO: this method will probably be a bottleneck. Look into prefetching or ensuring
     //  the swap_set stays in memory
     assert(batch_size == 8);
 
-    // TODO: this can be made more efficient. calculate ONCE.
-    alignas(32) int tmp[8];
-    if (!scoring->case_sensitive) {
-        a = tolower(a);
-        for (size_t i = 0; i < batch_size; i++) {
-            tmp[i] = tolower(b[i]);
-        }
-    }
-
     // compute the indices we are going to use to gather
-    __m256i base = _mm256_set1_epi32(a * 256);
-    __m256i idx = _mm256_add_epi32(base, _mm256_load_si256((__m256i *)tmp));
-//    int32_t indices[8];
-//    int base = a * 256;
-//    for (int i = 0; i < (int) batch_size; i++) {
-//        // todo: the way i ordered the batch doesnt even help much.. revert
-//        //   its causing too many problems...
-//        indices[i] = base + tmp[i];
-//    }
-//  __m256i idx = _mm256_loadu_si256((__m256i *)indices);
+    __m256i base = _mm256_set1_epi32(a_index * 32);
+    __m256i idx = _mm256_add_epi32(base, _mm256_load_si256((__m256i *) b_indexes));
 
-    // TODO: ensure that matching a with \0 results in zero score -- edit: im matching it with * now
-    // TODO: score_t[256][256] -> can probs be made smaller (better for cache)
-    int * swap_scores = (int *) scoring->swap_scores;
+    score_t * swap_scores = (int *) scoring->swap_scores;
     __m256i scores = _mm256_i32gather_epi32(swap_scores, idx, 4);
 
     return scores;

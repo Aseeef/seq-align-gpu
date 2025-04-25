@@ -28,21 +28,19 @@ typedef struct
   bool case_sensitive;
 
   // Array of characters that match to everything with the same penalty (i.e. 'N's)
-  uint32_t swap_set[256][256/32];
+  uint32_t swap_set[32];
   // The penalty or the reward for a match/mismatch between two characters.
-  score_t swap_scores[256][256];
+  score_t swap_scores[32][32];
 
   int min_penalty, max_penalty; // min, max {match/mismatch,gapopen etc.}
 } scoring_t;
 
-#ifndef bitset32_get
-  #define bitset32_get(arr,idx)   (((arr)[(idx)>>5] >> ((idx)&31)) & 0x1)
-  #define bitset32_set(arr,idx)   ((arr)[(idx)>>5] |=   (1<<((idx)&31)))
-  #define bitset32_clear(arr,idx) ((arr)[(idx)>>5] &=  ~(1<<((idx)&31)))
+#ifndef get_swap_bit
+    #define get_swap_bit(scoring, a, b) \
+        (((scoring)->swap_set[(size_t)(a)] >> (b)) & 1U)
+    #define set_swap_bit(scoring, a, b) \
+        ((scoring)->swap_set[(size_t)(a)] |= (1U << (b)))
 #endif
-
-#define get_swap_bit(scoring,a,b) bitset32_get((scoring)->swap_set[(size_t)(a)],b)
-#define set_swap_bit(scoring,a,b) bitset32_set((scoring)->swap_set[(size_t)(a)],b)
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,7 +52,11 @@ void scoring_init(scoring_t* scoring, int match, int mismatch,
 
 void scoring_add_mutation(scoring_t* scoring, char a, char b, int score);
 
-__m256i scoring_lookup(const scoring_t* scoring, size_t batch_size, char a, char * b);
+int letters_to_index(char c);
+
+char index_to_letters(int c);
+
+__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, int a_index, int * b_indexes);
 
 // Some scoring systems
 void scoring_system_default(scoring_t *scoring); // DNA/RNA default

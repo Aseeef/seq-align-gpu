@@ -20,9 +20,9 @@
 
 #include "seq_file/seq_file.h"
 
-#include "alignment.h"
 #include "alignment_cmdline.h"
 #include "alignment_scoring_load.h"
+#include "alignment_scoring.h"
 
 char parse_entire_int(char *str, int *result)
 {
@@ -384,12 +384,14 @@ static seq_file_t* open_seq_file(const char *path, bool use_zlib)
 // so we got 8 slots for the batch
 #define BATCH_SIZE 8
 
-void align_from_query_and_db(const char *query_path, const char *db_path,
-                     void (align)(size_t batch_size, char *query_seq, char *db_seq_batch, int seq_b_len,
+void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
+                     void (align)(size_t batch_size, char * query, char ** db_batch,
+                                  score_t * query_indexes, score_t * db_seq_index_batch, size_t batch_max_len,
                                   const char *query_name, const char **db_name),
                      bool use_zlib)
 {
     seq_file_t *query_file, *db_file;
+    size_t i;
 
     // Open query file
     if((query_file = open_seq_file(query_path, use_zlib)) == NULL)
@@ -422,28 +424,45 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
         return;
     }
 
+    char * query_seq = query_read.seq.b;
+    size_t query_seq_len = query_read.seq.end;
+    // characters are converted into indexes for table lookup
+    score_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int));
+
+    set_swap_bit(scoring, 4, 4);
+    assert(get_swap_bit(scoring, 4, 4));
+
+    // Replace unknown characters in query with an X
+    for(i = 0; i < query_seq_len; i++) {
+        query_indexes[i] = letters_to_index(query_seq[i]);
+        if(!get_swap_bit(scoring, query_indexes[i], query_indexes[i])) {
+            query_indexes[i] = letters_to_index('X');
+        }
+    }
+
     // Read database sequences and align each with the query
     read_t db_read;
     seq_read_alloc(&db_read);
 
-    char *db_seq_batch = NULL;
+    score_t *db_seq_index_batch = NULL;
+    char *db_seq_batch[BATCH_SIZE];
     char *db_name_batch[BATCH_SIZE];
     size_t batch_count = 0;
 
     bool len_set = false;
-    int batch_max_len = 0;
+    size_t batch_max_len = 0;
 
     while(seq_read(db_file, &db_read) > 0)
     {
         assert(db_read.name.end != 0);
 
         char * seq_b = db_read.seq.b;
+        size_t seq_b_len = db_read.seq.end;
 
-        int seq_b_len = (int) strlen(seq_b);
         if (!len_set) {
             len_set = true;
             batch_max_len = seq_b_len;
-            db_seq_batch = calloc(batch_max_len * BATCH_SIZE, sizeof(char));
+            db_seq_index_batch = aligned_alloc(32, batch_max_len * BATCH_SIZE * sizeof(score_t));
         } else {
             // technically, this is not strictly needed.
             // but to make reasoning about this application easier,
@@ -455,12 +474,16 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
             //assert(db_seq_len == (int) strlen(seq_b));
         }
 
-        for (int i = 0; i < seq_b_len; i++) {
-            db_seq_batch[i * BATCH_SIZE + batch_count] = seq_b[i];
+        assert(db_seq_index_batch != NULL);
+
+        for (i = 0; i < seq_b_len; i++) {
+            db_seq_index_batch[i * BATCH_SIZE + batch_count] = letters_to_index(seq_b[i]);
         }
-        for (int i = seq_b_len; i < batch_max_len; i++) {
-            db_seq_batch[i * BATCH_SIZE + batch_count] = '*';
+        // characters that are too long are matched with *
+        for (i = seq_b_len; i < batch_max_len; i++) {
+            db_seq_index_batch[i * BATCH_SIZE + batch_count] = letters_to_index('*');
         }
+        db_seq_batch[batch_count] = db_read.seq.b;
         db_name_batch[batch_count] = strdup(db_read.name.b);
 
         batch_count++;
@@ -468,14 +491,14 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
         if(batch_count == BATCH_SIZE)
         {
             assert(query_read.name.end != 0);
-            align(BATCH_SIZE, query_read.seq.b, db_seq_batch, batch_max_len,
+            // batch size, the char * query, the char ** batch, the query indexes, the optimized memory layout seq indexes
+            align(BATCH_SIZE, query_seq, db_seq_batch, query_indexes, db_seq_index_batch, batch_max_len,
                   query_read.name.b,
                   (const char **) db_name_batch);
             // reset variables for the next batch
             batch_count = 0;
             len_set = false;
-            free(db_seq_batch);
-            db_seq_batch = NULL;
+            free(db_seq_index_batch);
             batch_max_len = 0;
         }
     }
@@ -485,4 +508,5 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
     seq_close(db_file);
     seq_read_dealloc(&query_read);
     seq_read_dealloc(&db_read);
+    free(query_indexes);
 }
