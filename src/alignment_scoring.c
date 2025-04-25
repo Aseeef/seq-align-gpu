@@ -106,24 +106,8 @@ void scoring_lookup(const scoring_t *scoring, char a, char b,
         return;
     }
 
-    // Check wildcards
-    // Wildcards are used in the order they are given
-    // e.g. if we specify '--wildcard X 2 --wildcard Y 3' X:Y align with score 2
-    if (_scoring_check_wildcards(scoring, a, b, score)) {
-        *is_match = 1;
-        return;
-    }
-
-    // Use match/mismatch
-    if (scoring->use_match_mismatch) {
-        *score = (*is_match ? scoring->match : scoring->mismatch);
-        return;
-    }
-
-    // Error
-    fprintf(stderr, "Error: Unknown character pair (%c,%c) and "
-                    "match/mismatch have not been set\n", a, b);
-    exit(EXIT_FAILURE);
+    // Default score when no character pairs are set
+    *score = (*is_match ? scoring->match : scoring->mismatch);
 }
 
 /**
