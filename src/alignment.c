@@ -14,6 +14,7 @@
 #include <string.h>
 #include <ctype.h> // tolower
 #include <assert.h>
+#include <omp.h>
 #include <x86intrin.h> // <immintrin.h> doesnt have gather
 
 #include "alignment.h"
