@@ -394,7 +394,7 @@ static seq_file_t* open_seq_file(const char *path, bool use_zlib)
 // AVX can hold 32 bytes
 // ints are 4 bytes.
 // so we got 8 slots for the batch
-#define BATCH_SIZE 16
+#define BATCH_SIZE 8
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
                      void (align)(size_t batch_size, char * query, char ** db_batch,

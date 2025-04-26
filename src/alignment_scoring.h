@@ -15,7 +15,7 @@
 #include <limits.h> // INT_MIN
 #include <stdalign.h>
 
-typedef uint16_t score_t;
+typedef uint32_t score_t;
 #define SCORE_MIN INT_MIN
 
 typedef struct
