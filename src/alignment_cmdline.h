@@ -9,10 +9,6 @@
 #ifndef ALIGNMENT_CMDLINE_HEADER_SEEN
 #define ALIGNMENT_CMDLINE_HEADER_SEEN
 
-// request decent POSIX version
-#define _XOPEN_SOURCE 700
-#define _BSD_SOURCE
-
 #include <stdarg.h> // required for va_list
 #include <stdbool.h>
 #include "seq_file/seq_file.h"
@@ -47,6 +43,9 @@ typedef struct
   const char *seq1, *seq2;
 } cmdline_t;
 
+char parse_entire_score_t(char *str, score_t *result);
+char parse_entire_short(char *str, short *result);
+char parse_entire_ushort(char *str, unsigned short *result);
 char parse_entire_int(char *str, int *result);
 char parse_entire_uint(char *str, unsigned int *result);
 
