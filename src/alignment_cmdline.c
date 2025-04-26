@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <limits.h> // INT_MIN
 #include <stdarg.h> // for va_list
+#include <time.h>
 
 #include "seq_file/seq_file.h"
 
@@ -368,6 +369,17 @@ char* cmdline_get_file2(cmdline_t *cmd)
   return cmd->file_path2;
 }
 
+static double interval(struct timespec start, struct timespec end) {
+    struct timespec temp;
+    temp.tv_sec = end.tv_sec - start.tv_sec;
+    temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+    if (temp.tv_nsec < 0) {
+        temp.tv_sec = temp.tv_sec - 1;
+        temp.tv_nsec = temp.tv_nsec + 1000000000;
+    }
+    return (((double) temp.tv_sec) + ((double) temp.tv_nsec) * 1.0e-9);
+}
+
 static seq_file_t* open_seq_file(const char *path, bool use_zlib)
 {
   return (strcmp(path,"-") != 0 || use_zlib) ? seq_open(path)
@@ -391,6 +403,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
                      bool use_zlib)
 {
     seq_file_t *query_file, *db_file;
+    struct timespec time_start, time_stop;
     size_t i;
 
     // Open query file
@@ -449,6 +462,8 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     bool len_set = false;
     size_t batch_max_len = 0;
 
+    double total_time = 0;
+
     while(seq_read(db_file, &db_read) > 0)
     {
         assert(db_read.name.end != 0);
@@ -487,6 +502,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
         if(batch_count == BATCH_SIZE)
         {
+            clock_gettime(CLOCK_REALTIME, &time_start);
             assert(query_read.name.end != 0);
             // batch size, the char * query, the char ** batch, the query indexes, the optimized memory layout seq indexes
             align(BATCH_SIZE, query_seq, db_seq_batch, query_indexes, db_seq_index_batch, query_seq_len, batch_max_len,
@@ -497,8 +513,12 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             len_set = false;
             free(db_seq_index_batch);
             batch_max_len = 0;
+            clock_gettime(CLOCK_REALTIME, &time_stop);
+            total_time += interval(time_start, time_stop);
         }
     }
+
+    printf("Total time: %f\n", total_time);
 
     // Close files and free memory
     seq_close(query_file);
