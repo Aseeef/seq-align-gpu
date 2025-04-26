@@ -231,7 +231,7 @@ static void alignment_fill_matrices(aligner_t * aligner)
 // Note: len_b must be same for all batches
 void aligner_align(aligner_t *aligner,
                    char *seq_a, char **seq_b_batch,
-                   score_t * seq_a_indexes, score_t * seq_b_batch_indexes,
+                   int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
                    size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring)
 {
@@ -287,7 +287,7 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
       printf("(batch no: %zi/%zi, seq_a: %.*s\nseq_b: %.*s\n",
              b + 1, batch_size,
              (int)aligner->score_width-1, aligner->seq_a_str,
-             strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
+             (int)strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
 
       printf("\n");
 

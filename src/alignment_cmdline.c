@@ -25,6 +25,54 @@
 #include "alignment_scoring_load.h"
 #include "alignment_scoring.h"
 
+char parse_entire_score_t(char *str, score_t *result) {
+  if (sizeof(score_t) == sizeof(int)) {
+    return parse_entire_uint(str, result);
+  } else if (sizeof(score_t) == sizeof(short)) {
+    return parse_entire_ushort(str, result);
+  } else {
+    // shouldn't happen
+    fprintf(stderr, "Error: sizeof(score_t) is not int or short\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+char parse_entire_short(char *str, short *result)
+{
+  size_t len = strlen(str);
+
+  char *strtol_last_char_ptr = str;
+  long tmp = strtol(str, &strtol_last_char_ptr, 10);
+
+  if(tmp > SHRT_MAX || tmp < SHRT_MIN || strtol_last_char_ptr != str + len)
+  {
+    return 0;
+  }
+  else
+  {
+    *result = (short)tmp;
+    return 1;
+  }
+}
+
+char parse_entire_ushort(char *str, unsigned short *result)
+{
+  size_t len = strlen(str);
+
+  char *strtol_last_char_ptr = str;
+  long tmp = strtol(str, &strtol_last_char_ptr, 10);
+
+  if(tmp > USHRT_MAX || strtol_last_char_ptr != str + len)
+  {
+    return 0;
+  }
+  else
+  {
+    *result = (short)tmp;
+    return 1;
+  }
+}
+
 char parse_entire_int(char *str, int *result)
 {
   size_t len = strlen(str);
@@ -275,7 +323,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       }
       else if(strcasecmp(argv[argi], "--gapopen") == 0)
       {
-        if(!parse_entire_int(argv[argi+1], &scoring->gap_open))
+        if(!parse_entire_score_t(argv[argi+1], &scoring->gap_open))
         {
           usage("Invalid --gapopen argument ('%s') must be an int", argv[argi+1]);
         }
@@ -284,7 +332,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       }
       else if(strcasecmp(argv[argi], "--gapextend") == 0)
       {
-        if(!parse_entire_int(argv[argi+1], &scoring->gap_extend))
+        if(!parse_entire_score_t(argv[argi+1], &scoring->gap_extend))
         {
           usage("Invalid --gapextend argument ('%s') must be an int",
                 argv[argi+1]);
