@@ -125,8 +125,8 @@ static void alignment_fill_matrices(aligner_t * aligner)
           // this prefetches into L1 cache
           char const* prefetch_addr = (char const*)(scoring->swap_scores + next_a_index * 32);
           // I need the next 128 bytes for the next loop of the scoring lookup
-          _mm_prefetch(prefetch_addr, _MM_HINT_T1);
-          _mm_prefetch(prefetch_addr + 64, _MM_HINT_T1);
+          _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+          _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
 
           // substitution penalty
           __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i], aligner->seq_b_batch_indexes + (seq_j*batch_size));
