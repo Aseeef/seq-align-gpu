@@ -17,12 +17,13 @@
 #include <stdio.h>
 #include <limits.h> // INT_MIN
 #include <stdarg.h> // for va_list
+#include <time.h>
 
 #include "seq_file/seq_file.h"
 
-#include "alignment.h"
 #include "alignment_cmdline.h"
 #include "alignment_scoring_load.h"
+#include "alignment_scoring.h"
 
 char parse_entire_int(char *str, int *result)
 {
@@ -101,6 +102,7 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
 "    --gapopen <score>    [default: %i]\n"
 "    --gapextend <score>  [default: %i]\n"
 "\n"
+// TODO: worth refractoring to ensure ppl always pass in what i want
 "    --substitution_matrix <file>  see details for formatting\n\n",
           defaults[0], defaults[1],
           defaults[2], defaults[3]);
@@ -367,6 +369,17 @@ char* cmdline_get_file2(cmdline_t *cmd)
   return cmd->file_path2;
 }
 
+static double interval(struct timespec start, struct timespec end) {
+    struct timespec temp;
+    temp.tv_sec = end.tv_sec - start.tv_sec;
+    temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+    if (temp.tv_nsec < 0) {
+        temp.tv_sec = temp.tv_sec - 1;
+        temp.tv_nsec = temp.tv_nsec + 1000000000;
+    }
+    return (((double) temp.tv_sec) + ((double) temp.tv_nsec) * 1.0e-9);
+}
+
 static seq_file_t* open_seq_file(const char *path, bool use_zlib)
 {
   return (strcmp(path,"-") != 0 || use_zlib) ? seq_open(path)
@@ -381,14 +394,17 @@ static seq_file_t* open_seq_file(const char *path, bool use_zlib)
 // AVX can hold 32 bytes
 // ints are 4 bytes.
 // so we got 8 slots for the batch
-#define BATCH_SIZE 8
+#define BATCH_SIZE 16
 
-void align_from_query_and_db(const char *query_path, const char *db_path,
-                     void (align)(size_t batch_size, char *query_seq, char *db_seq_batch, int seq_b_len,
+void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
+                     void (align)(size_t batch_size, char * query, char ** db_batch,
+                                  int32_t * query_indexes, int32_t * db_seq_index_batch, size_t query_len, size_t batch_max_len,
                                   const char *query_name, const char **db_name),
                      bool use_zlib)
 {
     seq_file_t *query_file, *db_file;
+    struct timespec time_start, time_stop;
+    size_t i;
 
     // Open query file
     if((query_file = open_seq_file(query_path, use_zlib)) == NULL)
@@ -421,27 +437,44 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
         return;
     }
 
+    char * query_seq = query_read.seq.b;
+    size_t query_seq_len = query_read.seq.end;
+    // characters are converted into indexes for table lookup
+    int32_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int32_t));
+
+    // Replace unknown characters in query with an X
+    for(i = 0; i < query_seq_len; i++) {
+        query_indexes[i] = letters_to_index(query_seq[i]);
+        if(!get_swap_bit(scoring, query_indexes[i], query_indexes[i])) {
+            query_indexes[i] = letters_to_index('X');
+        }
+    }
+
     // Read database sequences and align each with the query
     read_t db_read;
     seq_read_alloc(&db_read);
 
-    char *db_seq_batch = NULL;
+    int32_t *db_seq_index_batch = NULL;
+    char *db_seq_batch[BATCH_SIZE];
     char *db_name_batch[BATCH_SIZE];
     size_t batch_count = 0;
 
     bool len_set = false;
-    int db_seq_len = 0;
+    size_t batch_max_len = 0;
+
+    double total_time = 0;
 
     while(seq_read(db_file, &db_read) > 0)
     {
         assert(db_read.name.end != 0);
 
         char * seq_b = db_read.seq.b;
+        size_t seq_b_len = db_read.seq.end;
 
         if (!len_set) {
-            db_seq_len = (int) strlen(seq_b);
             len_set = true;
-            db_seq_batch = calloc(db_seq_len * BATCH_SIZE, sizeof(char));
+            batch_max_len = seq_b_len;
+            db_seq_index_batch = aligned_alloc(32, batch_max_len * BATCH_SIZE * sizeof(int32_t));
         } else {
             // technically, this is not strictly needed.
             // but to make reasoning about this application easier,
@@ -450,33 +483,47 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
             // and handle this in our code. Since in this version of the code
             // we'd assume DB entries are sorted in order of longest seq length
             // to shortest, our memory allocation approach should work fine
-            assert(db_seq_len == (int) strlen(seq_b));
+            //assert(db_seq_len == (int) strlen(seq_b));
         }
 
-        for (int i = 0; i < db_seq_len; i++) {
-            db_seq_batch[i * BATCH_SIZE + batch_count] = seq_b[i];
+        assert(db_seq_index_batch != NULL);
+
+        for (i = 0; i < seq_b_len; i++) {
+            db_seq_index_batch[i * BATCH_SIZE + batch_count] = letters_to_index(seq_b[i]);
         }
+        // characters that are too long are matched with *
+        for (i = seq_b_len; i < batch_max_len; i++) {
+            db_seq_index_batch[i * BATCH_SIZE + batch_count] = letters_to_index('*');
+        }
+        db_seq_batch[batch_count] = strdup(db_read.seq.b);
         db_name_batch[batch_count] = strdup(db_read.name.b);
 
         batch_count++;
 
         if(batch_count == BATCH_SIZE)
         {
+            clock_gettime(CLOCK_REALTIME, &time_start);
             assert(query_read.name.end != 0);
-            align(BATCH_SIZE, query_read.seq.b, db_seq_batch, db_seq_len,
+            // batch size, the char * query, the char ** batch, the query indexes, the optimized memory layout seq indexes
+            align(BATCH_SIZE, query_seq, db_seq_batch, query_indexes, db_seq_index_batch, query_seq_len, batch_max_len,
                   query_read.name.b,
                   (const char **) db_name_batch);
-            batch_count = 0; // Reset batch count
+            // reset variables for the next batch
+            batch_count = 0;
             len_set = false;
-            free(db_seq_batch);
-            db_seq_batch = NULL;
-
+            free(db_seq_index_batch);
+            batch_max_len = 0;
+            clock_gettime(CLOCK_REALTIME, &time_stop);
+            total_time += interval(time_start, time_stop);
         }
     }
+
+    printf("Total time: %f\n", total_time);
 
     // Close files and free memory
     seq_close(query_file);
     seq_close(db_file);
     seq_read_dealloc(&query_read);
     seq_read_dealloc(&db_read);
+    free(query_indexes);
 }

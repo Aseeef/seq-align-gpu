@@ -58,48 +58,36 @@ void scoring_init(scoring_t *scoring,
  * @param score            Score for the mutation (alignment between a and b).
  */
 void scoring_add_mutation(scoring_t *scoring, char a, char b, int score) {
-    scoring->swap_scores[(size_t) a][(size_t) b] = score;
-    set_swap_bit(scoring, a, b);
+    size_t index_a = letters_to_index(a);
+    size_t index_b = letters_to_index(b);
+    scoring->swap_scores[index_a][index_b] = score;
+    set_swap_bit(scoring, index_a, index_b);
     scoring->min_penalty = MIN2(scoring->min_penalty, score);
     scoring->max_penalty = MAX2(scoring->max_penalty, score);
 }
 
-/**
- * Looks up the score for aligning characters a and a batch of b's and determines if they match.
- *
- * @param scoring          Pointer to the scoring_t structure.
- * @param batch_size       The batch size
- * @param a                Query character in the alignment.
- * @param b_batch          DB batch of characters in the alignment
- * @return                 The scores for aligning a and the batch of b's.
- */
-__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, char a, char * b) {
-    // TODO: this method will probably be a bottleneck. Look into prefetching or ensuring
-    // the swap_set stays in memory
-    assert(batch_size == 8);
-
-    // TODO: this can be made more efficient somehow
-    char tmp[8];
-    if (!scoring->case_sensitive) {
-        a = tolower(a);
-        for (size_t i = 0; i < batch_size; i++) {
-            tmp[i] = tolower(b[i]);
-        }
+int letters_to_index(char c) {
+    if (c >= 97 && c < 123) {
+        return c - 96;
+    } else if (c >= 65 && c < 91) {
+        return c - 64;
+    } else if (c == 42) {
+        return 31;
+    } else {
+        printf("Error: %c is not a legal character for the substitution matrix!\n", c);
+        exit(1);
     }
+}
 
-    // compute the indices we are going to use to gather
-    int32_t indices[8];
-    int base = a * 256;
-    for (int i = 0; i < (int) batch_size; i++) {
-        // todo: the way i ordered the batch doesnt even help much.. revert
-        //   its causing too many problems...
-        indices[i] = base + tmp[i];
+char index_to_letters(int c) {
+    if (c >= 1 && c < 27) {
+        return c + 64;
+    } else if (c == 31) {
+        return '*';
+    } else {
+        printf("Error: %d is not a legal index for the substitution matrix!\n", c);
+        exit(1);
     }
-    __m256i idx = _mm256_loadu_si256((__m256i *)indices);
-    int * swap_scores = (int *) scoring->swap_scores;
-    __m256i scores = _mm256_i32gather_epi32(swap_scores, idx, 4);
-
-    return scores;
 }
 
 /**

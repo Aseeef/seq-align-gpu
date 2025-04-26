@@ -10,6 +10,7 @@
 
 #include <string.h> // memset
 #include "alignment_scoring.h"
+#include <x86intrin.h>
 
 #ifndef ROUNDUP2POW
   #define ROUNDUP2POW(x) _rndup2pow64(x)
@@ -24,7 +25,8 @@
 typedef struct
 {
     const scoring_t* scoring;     // Scoring scheme used (match/mismatch/gap)
-    char *seq_a, *seq_b_batch;    // Pointers to input sequences A and B
+    int32_t *seq_a_indexes, *seq_b_batch_indexes;    // Pointers to input sequences A and B
+    char *seq_a_str, **seq_b_str_batch;    // Pointers to input sequences A and B
     size_t b_batch_size;                // the batch size of b
     size_t score_width, score_height; // Matrix dimensions: width = len(seq_a)+1, height = len(seq_b_batch[i])+1
     score_t *match_scores;        // Full match/mismatch matrix (score for aligning A[i] with B[j])
@@ -53,7 +55,8 @@ extern "C" {
  *   scoring   - pointer to scoring scheme (match/mismatch/gaps)
  */
 void aligner_align(aligner_t *aligner,
-                   char *seq_a, char *seq_b_batch,
+                   char *seq_a, char **seq_b_batch,
+                   score_t * seq_a_indexes, score_t * seq_b_batch_indexes,
                    size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring);
 

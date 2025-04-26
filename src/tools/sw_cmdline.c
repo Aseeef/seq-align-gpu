@@ -30,9 +30,6 @@ scoring_t scoring;
 // Alignment results stored here
 sw_aligner_t *sw;
 
-size_t alignment_index = 0;
-bool wait_on_keystroke = 0;
-
 static void sw_set_default_scoring() {
     scoring_system_default(&scoring);
 
@@ -44,11 +41,12 @@ static void sw_set_default_scoring() {
 }
 
 // Align two sequences against each other to find local alignments between them
-void align_batch(size_t batch_size, char *seq_a, char *seq_b_batch, int seq_b_len,
-           const char *seq_a_name, const char **seq_b_name_batch) {
+void align_batch(size_t batch_size, char * query, char ** db_batch,
+                 int32_t * query_indexes, int32_t * db_seq_index_batch, size_t query_len, size_t batch_max_len,
+                 const char *seq_a_name, const char **seq_b_name_batch) {
 
     // Check query has length > 0
-    if (seq_a[0] == '\0') {
+    if (query[0] == '\0') {
         fprintf(stderr, "Error: The query must have length > 0\n");
         fflush(stderr);
 
@@ -61,12 +59,12 @@ void align_batch(size_t batch_size, char *seq_a, char *seq_b_batch, int seq_b_le
         return;
     }
 
-    smith_waterman_align_batch(seq_a, seq_b_batch, seq_b_len, batch_size, &scoring, sw);
+    smith_waterman_align_batch(query, db_batch,
+                               query_indexes, db_seq_index_batch,
+                               query_len, batch_max_len, batch_size,
+                               &scoring, sw);
 
     aligner_t *aligner = smith_waterman_get_aligner(sw);
-    size_t len_a = aligner->score_width - 1, len_b = aligner->score_height - 1;
-
-    printf("== Alignment %zu lengths (%lu, %lu):\n", alignment_index, len_a, len_b);
 
     if (cmd->print_matrices) {
         alignment_print_matrices(aligner, batch_size);
@@ -79,7 +77,7 @@ void align_batch(size_t batch_size, char *seq_a, char *seq_b_batch, int seq_b_le
     }
 
     if (cmd->print_seq) {
-        fputs(seq_a, stdout);
+        fputs(query, stdout);
         putc('\n', stdout);
     }
 
@@ -93,7 +91,7 @@ void align_batch(size_t batch_size, char *seq_a, char *seq_b_batch, int seq_b_le
         }
 
         if (cmd->print_seq) {
-            fputs(seq_b_name_batch[b], stdout);
+            fputs(db_batch[b], stdout);
             putc('\n', stdout);
         }
 
@@ -106,9 +104,6 @@ void align_batch(size_t batch_size, char *seq_a, char *seq_b_batch, int seq_b_le
 
     fputs("==\n", stdout);
     fflush(stdout);
-
-    // Increment sequence alignment counter
-    alignment_index++;
 }
 
 int main(int argc, char *argv[]) {
@@ -127,7 +122,7 @@ int main(int argc, char *argv[]) {
     const char *db_file = cmdline_get_file2(cmd);
 
     if (query_file != NULL && db_file != NULL) {
-        align_from_query_and_db(query_file, db_file, &align_batch, !cmd->interactive);
+        align_from_query_and_db(query_file, db_file, &scoring, &align_batch, !cmd->interactive);
     } else {
         fprintf(stderr, "Error: Both query and database files must be provided\n");
         fflush(stderr);

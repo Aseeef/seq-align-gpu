@@ -27,7 +27,7 @@ typedef struct
 
   // All values initially 0
   bool case_sensitive;
-  int match, mismatch, gap_open, gap_extend;
+  score_t match, mismatch, gap_open, gap_extend;
 
   // SW specific
   unsigned int max_hits_per_alignment;
@@ -59,9 +59,10 @@ char* cmdline_get_file1(cmdline_t* cmd);
 char* cmdline_get_file2(cmdline_t* cmd);
 
 
-void align_from_query_and_db(const char *query_path, const char *db_path,
-                              void (align)(size_t batch_size, char *query_seq, char *db_seq_batch,
-                              int seq_b_len, const char *query_name, const char **db_name),
+void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
+                              void (align)(size_t batch_size, char * query, char ** db_batch,
+                                           int32_t * query_indexes, int32_t * db_seq_index_batch, size_t query_len, size_t batch_max_len,
+                                      const char *query_name, const char **db_name),
                               bool use_zlib);
 
 #endif
