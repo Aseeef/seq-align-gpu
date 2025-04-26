@@ -57,8 +57,8 @@ static void alignment_fill_matrices(aligner_t * aligner)
   size_t score_height = aligner->score_height;
   size_t i, j;
 
-  __m256i gap_open_penalty = _mm256_set1_epi32(scoring->gap_extend + scoring->gap_open);
-  __m256i gap_extend_penalty = _mm256_set1_epi32(scoring->gap_extend);
+  __m256i gap_open_penalty = _mm256_set1_epi16(scoring->gap_extend + scoring->gap_open);
+  __m256i gap_extend_penalty = _mm256_set1_epi16(scoring->gap_extend);
   __m256i min_v = _mm256_setzero_si256();
 
   const size_t batch_size = aligner->b_batch_size;

@@ -15,12 +15,12 @@
 #include <limits.h> // INT_MIN
 #include <stdalign.h>
 
-typedef int16_t score_t;
+typedef uint16_t score_t;
 #define SCORE_MIN INT_MIN
 
 typedef struct
 {
-  int gap_open, gap_extend;
+  score_t gap_open, gap_extend;
 
   // If swap_score not set, should we use match/mismatch values?
   bool use_match_mismatch;

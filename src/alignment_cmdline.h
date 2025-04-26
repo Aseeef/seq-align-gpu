@@ -27,7 +27,7 @@ typedef struct
 
   // All values initially 0
   bool case_sensitive;
-  int match, mismatch, gap_open, gap_extend;
+  score_t match, mismatch, gap_open, gap_extend;
 
   // SW specific
   unsigned int max_hits_per_alignment;
