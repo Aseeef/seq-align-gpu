@@ -14,7 +14,6 @@
 #include <string.h> // memset
 #include <ctype.h> // tolower
 #include <assert.h>
-#include <stdalign.h>
 
 #include "alignment_scoring.h"
 #include "alignment_macros.h"
@@ -82,34 +81,13 @@ int letters_to_index(char c) {
 
 char index_to_letters(int c) {
     if (c >= 1 && c < 27) {
-        return c + 65;
+        return c + 64;
     } else if (c == 31) {
         return '*';
     } else {
         printf("Error: %d is not a legal index for the substitution matrix!\n", c);
+        exit(1);
     }
-}
-
-/**
- * Looks up the score for aligning characters a and a batch of b's and determines if they match.
- *
- * @param scoring          Pointer to the scoring_t structure.
- * @param batch_size       The batch size
- * @param a                Query character in the alignment.
- * @param b_batch          DB batch of characters in the alignment
- * @return                 The scores for aligning a and the batch of b's.
- */
-static __m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, score_t a_index, score_t * b_indexes) {
-    assert(batch_size == 8);
-
-    // compute the indices we are going to use to gather
-    __m256i base = _mm256_set1_epi32(a_index * 32);
-    __m256i idx = _mm256_add_epi32(base, _mm256_load_si256((__m256i *) b_indexes));
-
-    score_t * swap_scores = (int *) scoring->swap_scores;
-    __m256i scores = _mm256_i32gather_epi32(swap_scores, idx, 4);
-
-    return scores;
 }
 
 /**

@@ -382,11 +382,11 @@ static seq_file_t* open_seq_file(const char *path, bool use_zlib)
 // AVX can hold 32 bytes
 // ints are 4 bytes.
 // so we got 8 slots for the batch
-#define BATCH_SIZE 8
+#define BATCH_SIZE 16
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
                      void (align)(size_t batch_size, char * query, char ** db_batch,
-                                  score_t * query_indexes, score_t * db_seq_index_batch, size_t batch_max_len,
+                                  int32_t * query_indexes, int32_t * db_seq_index_batch, size_t query_len, size_t batch_max_len,
                                   const char *query_name, const char **db_name),
                      bool use_zlib)
 {
@@ -427,7 +427,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     char * query_seq = query_read.seq.b;
     size_t query_seq_len = query_read.seq.end;
     // characters are converted into indexes for table lookup
-    score_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int));
+    int32_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int32_t));
 
     // Replace unknown characters in query with an X
     for(i = 0; i < query_seq_len; i++) {
@@ -441,7 +441,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     read_t db_read;
     seq_read_alloc(&db_read);
 
-    score_t *db_seq_index_batch = NULL;
+    int32_t *db_seq_index_batch = NULL;
     char *db_seq_batch[BATCH_SIZE];
     char *db_name_batch[BATCH_SIZE];
     size_t batch_count = 0;
@@ -459,7 +459,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
         if (!len_set) {
             len_set = true;
             batch_max_len = seq_b_len;
-            db_seq_index_batch = aligned_alloc(32, batch_max_len * BATCH_SIZE * sizeof(score_t));
+            db_seq_index_batch = aligned_alloc(32, batch_max_len * BATCH_SIZE * sizeof(int32_t));
         } else {
             // technically, this is not strictly needed.
             // but to make reasoning about this application easier,
@@ -480,7 +480,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
         for (i = seq_b_len; i < batch_max_len; i++) {
             db_seq_index_batch[i * BATCH_SIZE + batch_count] = letters_to_index('*');
         }
-        db_seq_batch[batch_count] = db_read.seq.b;
+        db_seq_batch[batch_count] = strdup(db_read.seq.b);
         db_name_batch[batch_count] = strdup(db_read.name.b);
 
         batch_count++;
@@ -489,7 +489,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
         {
             assert(query_read.name.end != 0);
             // batch size, the char * query, the char ** batch, the query indexes, the optimized memory layout seq indexes
-            align(BATCH_SIZE, query_seq, db_seq_batch, query_indexes, db_seq_index_batch, batch_max_len,
+            align(BATCH_SIZE, query_seq, db_seq_batch, query_indexes, db_seq_index_batch, query_seq_len, batch_max_len,
                   query_read.name.b,
                   (const char **) db_name_batch);
             // reset variables for the next batch
