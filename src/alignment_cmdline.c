@@ -11,7 +11,7 @@
 
 // request decent POSIX version
 #define _XOPEN_SOURCE 700
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <stdlib.h>
 #include <stdio.h>
