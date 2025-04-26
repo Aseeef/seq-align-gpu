@@ -6,10 +6,6 @@
  date: Nov 2013
  */
 
-// request decent POSIX version
-#define _XOPEN_SOURCE 700
-#define _BSD_SOURCE
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

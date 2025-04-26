@@ -11,7 +11,7 @@
 
 // request decent POSIX version
 #define _XOPEN_SOURCE 700
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,6 +24,54 @@
 #include "alignment_cmdline.h"
 #include "alignment_scoring_load.h"
 #include "alignment_scoring.h"
+
+char parse_entire_score_t(char *str, score_t *result) {
+  if (sizeof(score_t) == sizeof(int)) {
+    return parse_entire_uint(str, result);
+  } else if (sizeof(score_t) == sizeof(short)) {
+    return parse_entire_ushort(str, result);
+  } else {
+    // shouldn't happen
+    fprintf(stderr, "Error: sizeof(score_t) is not int or short\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+char parse_entire_short(char *str, short *result)
+{
+  size_t len = strlen(str);
+
+  char *strtol_last_char_ptr = str;
+  long tmp = strtol(str, &strtol_last_char_ptr, 10);
+
+  if(tmp > SHRT_MAX || tmp < SHRT_MIN || strtol_last_char_ptr != str + len)
+  {
+    return 0;
+  }
+  else
+  {
+    *result = (short)tmp;
+    return 1;
+  }
+}
+
+char parse_entire_ushort(char *str, unsigned short *result)
+{
+  size_t len = strlen(str);
+
+  char *strtol_last_char_ptr = str;
+  long tmp = strtol(str, &strtol_last_char_ptr, 10);
+
+  if(tmp > USHRT_MAX || strtol_last_char_ptr != str + len)
+  {
+    return 0;
+  }
+  else
+  {
+    *result = (short)tmp;
+    return 1;
+  }
+}
 
 char parse_entire_int(char *str, int *result)
 {
@@ -275,7 +323,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       }
       else if(strcasecmp(argv[argi], "--gapopen") == 0)
       {
-        if(!parse_entire_int(argv[argi+1], &scoring->gap_open))
+        if(!parse_entire_score_t(argv[argi+1], &scoring->gap_open))
         {
           usage("Invalid --gapopen argument ('%s') must be an int", argv[argi+1]);
         }
@@ -284,7 +332,7 @@ cmdline_t* cmdline_new(int argc, char **argv, scoring_t *scoring,
       }
       else if(strcasecmp(argv[argi], "--gapextend") == 0)
       {
-        if(!parse_entire_int(argv[argi+1], &scoring->gap_extend))
+        if(!parse_entire_score_t(argv[argi+1], &scoring->gap_extend))
         {
           usage("Invalid --gapextend argument ('%s') must be an int",
                 argv[argi+1]);
@@ -475,15 +523,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             len_set = true;
             batch_max_len = seq_b_len;
             db_seq_index_batch = aligned_alloc(32, batch_max_len * BATCH_SIZE * sizeof(int32_t));
-        } else {
-            // technically, this is not strictly needed.
-            // but to make reasoning about this application easier,
-            // ill definitely start with this. In order to allow
-            // other sequence lengths, we'd just need to do zero padding.
-            // and handle this in our code. Since in this version of the code
-            // we'd assume DB entries are sorted in order of longest seq length
-            // to shortest, our memory allocation approach should work fine
-            //assert(db_seq_len == (int) strlen(seq_b));
         }
 
         assert(db_seq_index_batch != NULL);

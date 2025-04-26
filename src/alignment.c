@@ -127,8 +127,8 @@ static void alignment_fill_matrices(aligner_t * aligner)
           // this prefetches into L1 cache
           char const* prefetch_addr = (char const*)(scoring->swap_scores + next_a_index * 32);
           // I need the next 128 bytes for the next loop of the scoring lookup
-          _mm_prefetch(prefetch_addr, _MM_HINT_T1);
-          _mm_prefetch(prefetch_addr + 64, _MM_HINT_T1);
+          _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+          _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
 
           // substitution penalty
           __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i], aligner->seq_b_batch_indexes + (seq_j*batch_size));
@@ -233,7 +233,7 @@ static void alignment_fill_matrices(aligner_t * aligner)
 // Note: len_b must be same for all batches
 void aligner_align(aligner_t *aligner,
                    char *seq_a, char **seq_b_batch,
-                   score_t * seq_a_indexes, score_t * seq_b_batch_indexes,
+                   int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
                    size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring)
 {
@@ -289,7 +289,7 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
       printf("(batch no: %zi/%zi, seq_a: %.*s\nseq_b: %.*s\n",
              b + 1, batch_size,
              (int)aligner->score_width-1, aligner->seq_a_str,
-             strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
+             (int)strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
 
       printf("\n");
 

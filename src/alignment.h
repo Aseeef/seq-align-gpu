@@ -56,7 +56,7 @@ extern "C" {
  */
 void aligner_align(aligner_t *aligner,
                    char *seq_a, char **seq_b_batch,
-                   score_t * seq_a_indexes, score_t * seq_b_batch_indexes,
+                   int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
                    size_t len_a, size_t len_b, size_t batch_size,
                    const scoring_t *scoring);
 
