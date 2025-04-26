@@ -523,15 +523,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             len_set = true;
             batch_max_len = seq_b_len;
             db_seq_index_batch = aligned_alloc(32, batch_max_len * BATCH_SIZE * sizeof(int32_t));
-        } else {
-            // technically, this is not strictly needed.
-            // but to make reasoning about this application easier,
-            // ill definitely start with this. In order to allow
-            // other sequence lengths, we'd just need to do zero padding.
-            // and handle this in our code. Since in this version of the code
-            // we'd assume DB entries are sorted in order of longest seq length
-            // to shortest, our memory allocation approach should work fine
-            //assert(db_seq_len == (int) strlen(seq_b));
         }
 
         assert(db_seq_index_batch != NULL);
