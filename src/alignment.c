@@ -48,8 +48,10 @@ inline static __m256i scoring_lookup(const scoring_t *scoring, int32_t a_index, 
     return packed_scores_16;
 }
 
+const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
+
 // Fill in traceback matrix for an ENTIRE BATCH
-static void alignment_fill_matrices(aligner_t * aligner)
+void alignment_fill_matrices(aligner_t * aligner)
 {
   score_t *match_scores = aligner->match_scores;
   score_t *gap_a_scores = aligner->gap_a_scores;
@@ -62,8 +64,6 @@ static void alignment_fill_matrices(aligner_t * aligner)
   __m256i gap_open_penalty = _mm256_set1_epi16(scoring->gap_extend + scoring->gap_open);
   __m256i gap_extend_penalty = _mm256_set1_epi16(scoring->gap_extend);
   __m256i min_v = _mm256_setzero_si256();
-
-  const size_t batch_size = aligner->b_batch_size;
 
   // null checks
   assert(match_scores != NULL);
@@ -82,13 +82,13 @@ static void alignment_fill_matrices(aligner_t * aligner)
   // I need to reset first col and first row of each batch
   __m256i zero_v = _mm256_setzero_si256();
   for (i = 0; i < score_width; i++) {
-      size_t offset = i * batch_size;
+      size_t offset = i * FULL_VECTOR_SIZE;
       _mm256_store_si256((__m256i *)(match_scores + offset), zero_v);
       _mm256_store_si256((__m256i *)(gap_a_scores + offset), zero_v);
       _mm256_store_si256((__m256i *)(gap_b_scores + offset), zero_v);
   }
   for (j = 0; j < score_height; j++) {
-      size_t offset = j * score_width * batch_size;
+      size_t offset = j * score_width * FULL_VECTOR_SIZE;
       _mm256_store_si256((__m256i *)(match_scores + offset), zero_v);
       _mm256_store_si256((__m256i *)(gap_a_scores + offset), zero_v);
       _mm256_store_si256((__m256i *)(gap_b_scores + offset), zero_v);
@@ -96,10 +96,10 @@ static void alignment_fill_matrices(aligner_t * aligner)
 
   // start at position [1][1]
   index_upleft = 0;
-  index_up = batch_size;
-  index_left = score_width*batch_size;
-  index = (score_width*batch_size)+batch_size;
-  index_right = (score_width*batch_size)+(2*batch_size);
+  index_up = FULL_VECTOR_SIZE;
+  index_left = score_width*FULL_VECTOR_SIZE;
+  index = (score_width*FULL_VECTOR_SIZE)+FULL_VECTOR_SIZE;
+  index_right = (score_width*FULL_VECTOR_SIZE)+(2*FULL_VECTOR_SIZE);
 
   // todo: Refactor the loops and combine with OMP to do parallel anti-diagonal wavefront
   //  calculation. First step with the OMP would be to refactor using naive wavefront. Then combine it with
@@ -131,7 +131,7 @@ static void alignment_fill_matrices(aligner_t * aligner)
           _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
 
           // substitution penalty
-          __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i], aligner->seq_b_batch_indexes + (seq_j*batch_size));
+          __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i], aligner->seq_b_batch_indexes + (seq_j*FULL_VECTOR_SIZE));
 
           // Prefetch gap_a_scores, gap_b_scores, match_scores at the upcoming index
           char const* gap_a_scores_ptr = (char const*) (gap_a_scores + index_right);
@@ -208,19 +208,19 @@ static void alignment_fill_matrices(aligner_t * aligner)
           gap_b_score = _mm256_max_epi16(gap_b_score, min_v);
           _mm256_store_si256((__m256i *)(gap_b_scores + index), gap_b_score);
 
-          index += batch_size;
-          index_left += batch_size;
-          index_up += batch_size;
-          index_upleft += batch_size;
-          index_right += batch_size;
+          index += FULL_VECTOR_SIZE;
+          index_left += FULL_VECTOR_SIZE;
+          index_up += FULL_VECTOR_SIZE;
+          index_upleft += FULL_VECTOR_SIZE;
+          index_right += FULL_VECTOR_SIZE;
       }
       // need to increment again to make everyone
       // get to the next row
-      index += batch_size;
-      index_left += batch_size;
-      index_up += batch_size;
-      index_upleft += batch_size;
-      index_right += batch_size;
+      index += FULL_VECTOR_SIZE;
+      index_left += FULL_VECTOR_SIZE;
+      index_up += FULL_VECTOR_SIZE;
+      index_upleft += FULL_VECTOR_SIZE;
+      index_right += FULL_VECTOR_SIZE;
   }
 
     //printf("Matrix Index [3][2] = %d\n", match_scores[ARR_3D_index(score_width, batch_size, 3, 2, 7)]);
@@ -231,36 +231,54 @@ static void alignment_fill_matrices(aligner_t * aligner)
 }
 
 // Note: len_b must be same for all batches
-void aligner_align(aligner_t *aligner,
-                   char *seq_a, char **seq_b_batch,
+void aligner_update(aligner_t *aligner,
+                   char *seq_a_str, char **seq_b_str_batch,
+                   char * seq_a_fasta, char **seq_b_fasta_batch,
                    int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
-                   size_t len_a, size_t len_b, size_t batch_size,
+                   size_t len_a, size_t len_b, size_t vector_size,
                    const scoring_t *scoring)
 {
   aligner->scoring = scoring;
-  aligner->seq_a_str = seq_a;
-  aligner->seq_b_str_batch = seq_b_batch;
+  aligner->seq_a_str = seq_a_str;
+  aligner->seq_b_str_batch = seq_b_str_batch;
   aligner->seq_a_indexes = seq_a_indexes;
   aligner->seq_b_batch_indexes = seq_b_batch_indexes;
-  aligner->b_batch_size = batch_size;
+  aligner->seq_a_fasta = seq_a_fasta;
+  aligner->seq_b_fasta_batch = seq_b_fasta_batch;
+  aligner->vector_size = vector_size;
   aligner->score_width = len_a+1; // for col of all zeros
   aligner->score_height = len_b+1; // for the row of all zeros
 
   // The first allocation is expected to be the largest width*height.
   assert(aligner->capacity == 0 || ROUNDUP2POW(aligner->score_width * aligner->score_height) <= aligner->capacity);
+}
 
-  if(aligner->max_scores == NULL)
-  {
+aligner_t * aligner_create(char *seq_a_str, char **seq_b_str_batch,
+                   char * seq_a_fasta, char **seq_b_fasta_batch,
+                   int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
+                   size_t len_a, size_t len_b, size_t vector_size,
+                   const scoring_t *scoring) {
+    aligner_t * aligner = malloc(sizeof(aligner_t));
+    aligner->scoring = scoring;
+    aligner->seq_a_str = seq_a_str;
+    aligner->seq_b_str_batch = seq_b_str_batch;
+    aligner->seq_a_fasta = seq_a_fasta;
+    aligner->seq_b_fasta_batch = seq_b_fasta_batch;
+    aligner->seq_a_indexes = seq_a_indexes;
+    aligner->seq_b_batch_indexes = seq_b_batch_indexes;
+    aligner->vector_size = vector_size;
+    aligner->score_width = len_a+1; // for col of all zeros
+    aligner->score_height = len_b+1; // for the row of all zeros
+
     size_t capacity = ROUNDUP2POW(aligner->score_width * aligner->score_height);
     aligner->capacity = capacity;
-    aligner->max_scores = aligned_alloc(32, sizeof(score_t) * batch_size);
-    size_t mem = sizeof(score_t) * capacity * batch_size;
-    aligner->match_scores = aligned_alloc(32, mem);
-    aligner->gap_a_scores = aligned_alloc(32, mem);
-    aligner->gap_b_scores = aligned_alloc(32, mem);
-  }
+    aligner->max_scores = aligned_alloc(32, sizeof(score_t) * vector_size);
+    size_t mem_size = sizeof(score_t) * capacity * vector_size;
+    aligner->match_scores = aligned_alloc(32, mem_size);
+    aligner->gap_a_scores = aligned_alloc(32, mem_size);
+    aligner->gap_b_scores = aligned_alloc(32, mem_size);
 
-  alignment_fill_matrices(aligner);
+    return aligner;
 }
 
 void aligner_destroy(aligner_t *aligner)
@@ -273,21 +291,22 @@ void aligner_destroy(aligner_t *aligner)
 }
 
 
-void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
+void alignment_print_matrices(const aligner_t *aligner)
 {
   const score_t* match_scores = aligner->match_scores;
   const score_t* gap_a_scores = aligner->gap_a_scores;
   const score_t* gap_b_scores = aligner->gap_b_scores;
 
-  size_t i, j, b;
+  size_t i, j, b, vector_size;
+  vector_size = aligner->vector_size;
 
 
     // Note: Yes, the indexing here is not cache friendly but it's fine, this code is only
   // used to debug. So I rather not refactor it...
-  for (b = 0 ; b < batch_size; b++) {
+  for (b = 0 ; b < vector_size; b++) {
 
       printf("(batch no: %zi/%zi, seq_a: %.*s\nseq_b: %.*s\n",
-             b + 1, batch_size,
+             b + 1, vector_size,
              (int)aligner->score_width-1, aligner->seq_a_str,
              (int)strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
 
@@ -299,7 +318,7 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
           printf("%3i:", (int)j);
           for(i = 0; i < aligner->score_width; i++)
           {
-              printf("\t%3i", (int) match_scores[ARR_3D_index(aligner->score_width, batch_size, j, i, b)]);
+              printf("\t%3i", (int) match_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
               //printf("\t%3i", (int)ARR_LOOKUP(match_scores, aligner->score_width, i, j));
           }
           putc('\n', stdout);
@@ -310,7 +329,7 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
           printf("%3i:", (int)j);
           for(i = 0; i < aligner->score_width; i++)
           {
-              printf("\t%3i", (int) gap_a_scores[ARR_3D_index(aligner->score_width, batch_size, j, i, b)]);
+              printf("\t%3i", (int) gap_a_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
           }
           putc('\n', stdout);
       }
@@ -320,7 +339,7 @@ void alignment_print_matrices(const aligner_t *aligner, size_t batch_size)
           printf("%3i:", (int)j);
           for(i = 0; i < aligner->score_width; i++)
           {
-              printf("\t%3i", (int) gap_b_scores[ARR_3D_index(aligner->score_width, batch_size, j, i, b)]);
+              printf("\t%3i", (int) gap_b_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
           }
           putc('\n', stdout);
       }
