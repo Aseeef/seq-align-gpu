@@ -28,9 +28,9 @@
 
 char parse_entire_score_t(char *str, score_t *result) {
     if (sizeof(score_t) == sizeof(int)) {
-        return parse_entire_uint(str, result);
+        return parse_entire_int(str, result);
     } else if (sizeof(score_t) == sizeof(short)) {
-        return parse_entire_ushort(str, result);
+        return parse_entire_short(str, result);
     } else {
         // shouldn't happen
         fprintf(stderr, "Error: sizeof(score_t) is not int or short\n");
@@ -512,17 +512,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
                     scoring);
             }
 
-            // TODO DEBUG
-            // printf("Batch\n");
-            // for (int j = 0; j < max_seq_len_in_vec; j++) {
-            //     for (int k = 0; k < VECTOR_SIZE; k++) {
-            //         size_t ind = VECTOR_SIZE * j + k;
-            //         printf("%c,", index_to_letters(aligners[0]->seq_b_batch_indexes[ind]));
-            //     }
-            //     printf("\n");
-            // }
-            // exit(1);
-
             // reset variables for the next vector batch
             len_set = false;
             vec_elem_cnt = 0;
@@ -532,7 +521,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
             if (batch_cnt == BATCH_SIZE) {
 
-                clock_gettime(CLOCK_REALTIME, &time_start);
+            clock_gettime(CLOCK_REALTIME, &time_start);
 
 //#pragma omp parallel for schedule(static, 1)
                 for (i = 0; i < BATCH_SIZE; i++) {
@@ -551,14 +540,14 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
                     aligners[i]->seq_b_fasta_batch = NULL;
                 }
 
-                clock_gettime(CLOCK_REALTIME, &time_stop);
-                total_time += interval(time_start, time_stop);
+            clock_gettime(CLOCK_REALTIME, &time_stop);
+            total_time += interval(time_start, time_stop);
 
                 // reset batch cnt
                 batch_cnt = 0;
-            }
-
         }
+
+    }
     }
 
 

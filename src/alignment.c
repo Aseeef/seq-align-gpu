@@ -29,24 +29,39 @@
  * @return                 The scores for aligning a and the batch of b's.
  */
 inline static __m256i scoring_lookup(const scoring_t *scoring, int32_t a_index, int32_t *b_indexes) {
-    // Load the base address (the row) of the swap_scores for the given `a_index`
+    // base address (the row) of the swap_scores for a_index
     const int32_t *swap_scores = scoring->swap_scores[a_index];
 
-    // Load the indices for the batch
-    // must load two since simd batch is 16, and
-    // simd gather cant be used with shorts
-    __m256i idx_low = _mm256_load_si256((__m256i *) b_indexes);
-    __m256i idx_high = _mm256_load_si256((__m256i *) (b_indexes + 8));
+    __m256i idx_low = _mm256_loadu_si256((__m256i *) b_indexes); // Use loadu for potentially unaligned access
+    __m256i idx_high = _mm256_loadu_si256((__m256i *) (b_indexes + 8));
 
     // gather the scores from the swap_scores array
+    // need two, since batch has 16, 256-bit register can hold only 8
     __m256i scores_low = _mm256_i32gather_epi32(swap_scores, idx_low, 4);
     __m256i scores_high = _mm256_i32gather_epi32(swap_scores, idx_high, 4);
 
-    // clamps the scores into a vectors of shorts
-    __m256i packed_scores_16 = _mm256_packs_epi32(scores_low, scores_high);
+    // This part is cursed. To see what the problem is see:
+    // https://stackoverflow.com/questions/67979078/mm256-packs-epi32-except-pack-sequentially
 
-    return packed_scores_16;
+    // Pack the 32-bit integers into 16-bit integers with signed saturation.
+    // Output layout: [s0..3, s8..11 | s4..7, s12..15] (interleaved across 128-bit lanes)
+    __m256i packed_interleaved = _mm256_packs_epi32(scores_low, scores_high);
+
+    // This solution to the above problem was suggested by Gemini Pro 2.5.
+    // Prompt: https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221-Vbs7o7xRHvi1D2gWGdpiWL0vUtobbdp%22%5D,%22action%22:%22open%22,%22userId%22:%22112153521177605316268%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing
+
+    // Permute the 64-bit blocks to fix the order.
+    // Input chunks:  [0]      [1]      [2]      [3]
+    // Input data:    [s0..3]  [s8..11] [s4..7]  [s12..15]
+    // Desired order: [0]      [2]      [1]      [3]
+    // Desired data:  [s0..3]  [s4..7]  [s8..11] [s12..15] == [s0..7 | s8..15]
+    // The control 0xD8 (binary 11 01 10 00) selects input lanes [0, 2, 1, 3] for output.
+    __m256i final_packed = _mm256_permute4x64_epi64(packed_interleaved, 0xD8);
+
+    return final_packed;
 }
+
+const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
 
 const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
 
@@ -114,18 +129,17 @@ void alignment_fill_matrices(aligner_t *aligner) {
     size_t next_a_index;
     // int index = (h * width + w) * batch_size;
     for (seq_j = 0; seq_j < len_j; seq_j++) {
-        for (seq_i = 0; seq_i < len_i; seq_i++) {
+        for (seq_i = 0; seq_i < len_i; seq_i++) {char const *prefetch_addr;
             if (seq_i + 1 < len_i) {
-                next_a_index = aligner->seq_a_indexes[seq_i + 1];
+                next_a_index = aligner->seq_a_indexes[seq_i + 1];prefetch_addr =  (char const *) (scoring->swap_scores + next_a_index * 32);
+                _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+                _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
             } else if (seq_j + 1 < len_j) {
                 next_a_index = aligner->seq_a_indexes[0];
-            }
-            // Calculate the address of the start of the 128-byte block for the future a_index
-            // this prefetches into L1 cache
-            char const *prefetch_addr = (char const *) (scoring->swap_scores + next_a_index * 32);
-            // I need the next 128 bytes for the next loop of the scoring lookup
+            prefetch_addr = (char const *) (scoring->swap_scores + next_a_index * 32);
+
             _mm_prefetch(prefetch_addr, _MM_HINT_T0);
-            _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
+            _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);}
 
             // substitution penalty
             __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i],
@@ -220,8 +234,6 @@ void alignment_fill_matrices(aligner_t *aligner) {
         index_upleft += FULL_VECTOR_SIZE;
         index_right += FULL_VECTOR_SIZE;
     }
-
-    //printf("Matrix Index [3][2] = %d\n", match_scores[ARR_3D_index(score_width, batch_size, 3, 2, 7)]);
 
     // put back the max scores in this batch
     assert(aligner->match_scores != NULL);
