@@ -14,7 +14,6 @@
 #include <string.h>
 #include <assert.h>
 #include <omp.h>
-#include <x86intrin.h> // <immintrin.h> doesnt have gather
 
 #include "alignment.h"
 #include "alignment_macros.h"
@@ -60,8 +59,6 @@ inline static __m256i scoring_lookup(const scoring_t *scoring, int32_t a_index, 
 
     return final_packed;
 }
-
-const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
 
 const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
 
