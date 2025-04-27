@@ -300,8 +300,6 @@ void alignment_fill_matrices(aligner_t *aligner) {
         //_mm256_store_si256((__m256i *) gap_b_scores, zero_v);
     }
 
-    exit(1);
-
     // put back the max scores in this batch
     assert(aligner->max_scores != NULL);
     _mm256_storeu_si256((__m256i *) (aligner->max_scores), max_scores_vec);
