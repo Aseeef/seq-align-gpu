@@ -54,7 +54,7 @@ void align_batch(aligner_t * aligner, size_t total_cnt) {
     alignment_fill_matrices(aligner);
 
     if (cmd->print_matrices) {
-        alignment_print_matrices(aligner);
+        //alignment_print_matrices(aligner);
     }
 
     // seqA

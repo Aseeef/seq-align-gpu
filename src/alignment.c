@@ -67,9 +67,12 @@ const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
 
 // Fill in traceback matrix for an ENTIRE BATCH
 void alignment_fill_matrices(aligner_t *aligner) {
-    score_t *match_scores = aligner->match_scores;
-    score_t *gap_a_scores = aligner->gap_a_scores;
-    score_t *gap_b_scores = aligner->gap_b_scores;
+    score_t *prev_match_scores = aligner->prev_match_scores;
+    score_t *curr_match_scores = aligner->curr_match_scores;
+    score_t *prev_gap_a_scores = aligner->prev_gap_a_scores;
+    score_t *curr_gap_a_scores = aligner->curr_gap_a_scores;
+    score_t *prev_gap_b_scores = aligner->prev_gap_b_scores;
+    score_t *curr_gap_b_scores = aligner->curr_gap_b_scores;
     const scoring_t *scoring = aligner->scoring;
     size_t score_width = aligner->score_width;
     size_t score_height = aligner->score_height;
@@ -80,9 +83,12 @@ void alignment_fill_matrices(aligner_t *aligner) {
     __m256i min_v = _mm256_setzero_si256();
 
     // null checks
-    assert(match_scores != NULL);
-    assert(gap_a_scores != NULL);
-    assert(gap_b_scores != NULL);
+    assert(prev_match_scores != NULL);
+    assert(curr_match_scores != NULL);
+    assert(prev_gap_a_scores != NULL);
+    assert(curr_gap_a_scores != NULL);
+    assert(prev_gap_b_scores != NULL);
+    assert(curr_gap_b_scores != NULL);
     assert(scoring != NULL);
 
     size_t seq_i, seq_j, len_i = score_width - 1, len_j = score_height - 1;
@@ -97,23 +103,23 @@ void alignment_fill_matrices(aligner_t *aligner) {
     __m256i zero_v = _mm256_setzero_si256();
     for (i = 0; i < score_width; i++) {
         size_t offset = i * FULL_VECTOR_SIZE;
-        _mm256_store_si256((__m256i *) (match_scores + offset), zero_v);
-        _mm256_store_si256((__m256i *) (gap_a_scores + offset), zero_v);
-        _mm256_store_si256((__m256i *) (gap_b_scores + offset), zero_v);
+        _mm256_store_si256((__m256i *) (prev_match_scores + offset), zero_v);
+        _mm256_store_si256((__m256i *) (curr_match_scores + offset), zero_v);
+        _mm256_store_si256((__m256i *) (prev_gap_b_scores + offset), zero_v);
+        _mm256_store_si256((__m256i *) (curr_gap_b_scores + offset), zero_v);
     }
-    for (j = 0; j < score_height; j++) {
-        size_t offset = j * score_width * FULL_VECTOR_SIZE;
-        _mm256_store_si256((__m256i *) (match_scores + offset), zero_v);
-        _mm256_store_si256((__m256i *) (gap_a_scores + offset), zero_v);
-        _mm256_store_si256((__m256i *) (gap_b_scores + offset), zero_v);
+    for (j = 0; j < score_width; j++) {
+        size_t offset = j * FULL_VECTOR_SIZE;
+        _mm256_store_si256((__m256i *) (prev_gap_a_scores + offset), zero_v);
+        _mm256_store_si256((__m256i *) (curr_gap_a_scores + offset), zero_v);
     }
 
     // start at position [1][1]
-    index_upleft = 0;
-    index_up = FULL_VECTOR_SIZE;
-    index_left = score_width * FULL_VECTOR_SIZE;
-    index = (score_width * FULL_VECTOR_SIZE) + FULL_VECTOR_SIZE;
-    index_right = (score_width * FULL_VECTOR_SIZE) + (2 * FULL_VECTOR_SIZE);
+    index_upleft = 0; // in prev scores
+    index_up = FULL_VECTOR_SIZE; // in prev scores
+    index_left = 0; // in curr scores
+    index = FULL_VECTOR_SIZE; // in curr scores
+    index_right = (2 * FULL_VECTOR_SIZE); // in curr scores
 
     // todo: Refactor the loops and combine with OMP to do parallel anti-diagonal wavefront
     //  calculation. First step with the OMP would be to refactor using naive wavefront. Then combine it with
@@ -149,12 +155,14 @@ void alignment_fill_matrices(aligner_t *aligner) {
                                                           aligner->seq_b_batch_indexes + (seq_j * FULL_VECTOR_SIZE));
 
             // Prefetch gap_a_scores, gap_b_scores, match_scores at the upcoming index
-            char const *gap_a_scores_ptr = (char const *) (gap_a_scores + index_right);
-            char const *gap_b_scores_ptr = (char const *) (gap_b_scores + index_right);
-            char const *match_scores_ptr = (char const *) (match_scores + index_right);
+            char const *gap_a_scores_ptr = (char const *) (curr_gap_a_scores + index_right);
+            char const *gap_b_scores_ptr = (char const *) (curr_gap_b_scores + index_right);
+            char const *prev_match_scores_ptr = (char const *) (prev_match_scores + index_right);
+            char const *curr_match_scores_ptr = (char const *) (curr_match_scores + index_right);
             _mm_prefetch(gap_a_scores_ptr, _MM_HINT_T0);
             _mm_prefetch(gap_b_scores_ptr, _MM_HINT_T0);
-            _mm_prefetch(match_scores_ptr, _MM_HINT_T0);
+            _mm_prefetch(prev_match_scores_ptr, _MM_HINT_T0);
+            _mm_prefetch(curr_match_scores_ptr, _MM_HINT_T0);
 
             // 1) continue alignment
             // 2) close gap in seq_a
@@ -165,13 +173,23 @@ void alignment_fill_matrices(aligner_t *aligner) {
             //                                     gap_a_scores[index_upleft] + substitution_penalty,
             //                                     gap_b_scores[index_upleft] + substitution_penalty,
             //                                     min);
+            // H[i][j] = MAX(0, H[i-1][j-1] + substitution_penalty, F[i-1][j-1] + substitution_penalty, E[i-1][j-1] + substitution_penalty)
 
-            __m256i match_score = _mm256_load_si256((__m256i *) (match_scores + index_upleft));
+            __m256i match_score = _mm256_load_si256((__m256i *) (prev_match_scores + index_upleft));
+            if (seq_i == 0 || seq_j == 0)
+                // match score should be zero
+                assert(_mm256_testz_si256(match_score, match_score));
             match_score = _mm256_add_epi16(match_score, substitution_penalty);
 
-            __m256i gap_a_score = _mm256_load_si256((__m256i *) (gap_a_scores + index_upleft));
+            __m256i gap_a_score = _mm256_load_si256((__m256i *) (prev_gap_a_scores + index_upleft));
+            if (seq_i == 0 || seq_j == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(gap_a_score, gap_a_score));
             gap_a_score = _mm256_add_epi16(gap_a_score, substitution_penalty);
-            __m256i gap_b_score = _mm256_load_si256((__m256i *) (gap_b_scores + index_upleft));
+            __m256i gap_b_score = _mm256_load_si256((__m256i *) (prev_gap_b_scores + index_upleft));
+            if (seq_i == 0 || seq_j == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(gap_b_score, gap_b_score));
             gap_b_score = _mm256_add_epi16(gap_b_score, substitution_penalty);
 
             __m256i max_ab = _mm256_max_epi16(gap_a_score, gap_b_score);
@@ -179,7 +197,7 @@ void alignment_fill_matrices(aligner_t *aligner) {
             match_score = _mm256_max_epi16(max_mab, min_v);
 
             // save
-            _mm256_store_si256((__m256i *) (match_scores + index), match_score);
+            _mm256_store_si256((__m256i *) (curr_match_scores + index), match_score);
 
             // update best score
             // equal to: max_scores_vec[i] = (match_score[i] > max_scores_vec[i]) ? match_score[i] : max_scores_vec[i];
@@ -195,16 +213,26 @@ void alignment_fill_matrices(aligner_t *aligner) {
             //                         gap_a_scores[index_up] + gap_extend_penalty,
             //                         gap_b_scores[index_up] + gap_open_penalty,
             //                         min);
-            match_score = _mm256_load_si256((__m256i *) (match_scores + index_up));
+            // E[i][j] = MAX( 0, H[i-1][j] + gap_open_penalty, E[i-1][j] + gap_extend_penalty , F[i-1][j] + gap_open_penalty )
+            match_score = _mm256_load_si256((__m256i *) (prev_match_scores + index_up));
+            if (seq_j == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(match_score, match_score));
             match_score = _mm256_add_epi16(match_score, gap_open_penalty);
-            gap_a_score = _mm256_load_si256((__m256i *) (gap_a_scores + index_up));
+            gap_a_score = _mm256_load_si256((__m256i *) (prev_gap_a_scores + index_up));
+            if (seq_j == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(gap_a_score, gap_a_score));
             gap_a_score = _mm256_add_epi16(gap_a_score, gap_extend_penalty);
-            gap_b_score = _mm256_load_si256((__m256i *) (gap_b_scores + index_up));
+            gap_b_score = _mm256_load_si256((__m256i *) (prev_gap_b_scores + index_up));
+            if (seq_j == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(gap_b_score, gap_b_score));
             gap_b_score = _mm256_add_epi16(gap_b_score, gap_open_penalty);
             gap_a_score = _mm256_max_epi16(gap_a_score, match_score);
             gap_a_score = _mm256_max_epi16(gap_a_score, gap_b_score);
             gap_a_score = _mm256_max_epi16(gap_a_score, min_v);
-            _mm256_store_si256((__m256i *) (gap_a_scores + index), gap_a_score);
+            _mm256_store_si256((__m256i *) (curr_gap_a_scores + index), gap_a_score);
 
             // Update gap_b_scores[i][j]
             //          gap_b_scores[index]
@@ -212,16 +240,26 @@ void alignment_fill_matrices(aligner_t *aligner) {
             //                         gap_a_scores[index_left] + gap_open_penalty,
             //                         gap_b_scores[index_left] + gap_extend_penalty,
             //                         min);
-            match_score = _mm256_load_si256((__m256i *) (match_scores + index_left));
+            // F[i][j] = MAX( 0, H[i][j-1] + gap_open_penalty, E[i][j-1] + gap_open_penalty , F[i][j-1] + gap_extend_penalty )
+            match_score = _mm256_load_si256((__m256i *) (curr_match_scores + index_left));
+            if (seq_i == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(match_score, match_score));
             match_score = _mm256_add_epi16(match_score, gap_open_penalty);
-            gap_a_score = _mm256_load_si256((__m256i *) (gap_a_scores + index_left));
+            gap_a_score = _mm256_load_si256((__m256i *) (curr_gap_a_scores + index_left));
+            if (seq_i == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(gap_a_score, gap_a_score));
             gap_a_score = _mm256_add_epi16(gap_a_score, gap_open_penalty);
-            gap_b_score = _mm256_load_si256((__m256i *) (gap_b_scores + index_left));
+            gap_b_score = _mm256_load_si256((__m256i *) (curr_gap_b_scores + index_left));
+            if (seq_i == 0)
+                // match score should be zero
+                    assert(_mm256_testz_si256(gap_b_score, gap_b_score));
             gap_b_score = _mm256_add_epi16(gap_b_score, gap_extend_penalty);
             gap_b_score = _mm256_max_epi16(gap_b_score, match_score);
             gap_b_score = _mm256_max_epi16(gap_b_score, gap_a_score);
             gap_b_score = _mm256_max_epi16(gap_b_score, min_v);
-            _mm256_store_si256((__m256i *) (gap_b_scores + index), gap_b_score);
+            _mm256_store_si256((__m256i *) (curr_gap_b_scores + index), gap_b_score);
 
             index += FULL_VECTOR_SIZE;
             index_left += FULL_VECTOR_SIZE;
@@ -229,17 +267,43 @@ void alignment_fill_matrices(aligner_t *aligner) {
             index_upleft += FULL_VECTOR_SIZE;
             index_right += FULL_VECTOR_SIZE;
         }
-        // need to increment again to make everyone
-        // get to the next row
-        index += FULL_VECTOR_SIZE;
-        index_left += FULL_VECTOR_SIZE;
-        index_up += FULL_VECTOR_SIZE;
-        index_upleft += FULL_VECTOR_SIZE;
-        index_right += FULL_VECTOR_SIZE;
+        index_upleft = 0; // in prev scores
+        index_up = FULL_VECTOR_SIZE; // in prev scores
+        index_left = 0; // in curr scores
+        index = FULL_VECTOR_SIZE; // in curr scores
+        index_right = (2 * FULL_VECTOR_SIZE); // in curr scores
+
+        // // note: first row isn't printed. thats the row of all zeros
+        // // prints the current row of the first matrix in this batch
+        // if (seq_j == 0) {
+        //     printf("Query Sequence: %s\n", aligner->seq_a_str);
+        //     printf("DB Sequence: %s\n", aligner->seq_b_str_batch[1]);
+        // }
+        // for (seq_i = 0; seq_i < len_i + 1; seq_i++) {
+        //     printf("%d, ", curr_match_scores[(FULL_VECTOR_SIZE * seq_i) + 1]);
+        // }
+        // printf("\n");
+
+        score_t * temp1 = prev_match_scores;
+        prev_match_scores = curr_match_scores; // swap
+        curr_match_scores = temp1;
+        score_t * temp2 = prev_gap_a_scores;
+        prev_gap_a_scores = curr_gap_a_scores;
+        curr_gap_a_scores = temp2;
+        score_t * temp3 = prev_gap_b_scores;
+        prev_gap_b_scores = curr_gap_b_scores;
+        curr_gap_b_scores = temp3;
+        // the first index of curr_match_scores has to be a zero
+        // should need to do this actually because the first elem is never actually touched
+        //_mm256_store_si256((__m256i *) temp, zero_v);
+        //_mm256_store_si256((__m256i *) gap_a_scores, zero_v);
+        //_mm256_store_si256((__m256i *) gap_b_scores, zero_v);
     }
 
+    exit(1);
+
     // put back the max scores in this batch
-    assert(aligner->match_scores != NULL);
+    assert(aligner->max_scores != NULL);
     _mm256_storeu_si256((__m256i *) (aligner->max_scores), max_scores_vec);
 }
 
@@ -260,9 +324,6 @@ void aligner_update(aligner_t *aligner,
     aligner->vector_size = vector_size;
     aligner->score_width = len_a + 1; // for col of all zeros
     aligner->score_height = len_b + 1; // for the row of all zeros
-
-    // The first allocation is expected to be the largest width*height.
-    assert(aligner->capacity == 0 || ROUNDUP2POW(aligner->score_width * aligner->score_height) <= aligner->capacity);
 }
 
 aligner_t *aligner_create(char *seq_a_str, char **seq_b_str_batch,
@@ -282,74 +343,77 @@ aligner_t *aligner_create(char *seq_a_str, char **seq_b_str_batch,
     aligner->score_width = len_a + 1; // for col of all zeros
     aligner->score_height = len_b + 1; // for the row of all zeros
 
-    size_t capacity = ROUNDUP2POW(aligner->score_width * aligner->score_height);
-    aligner->capacity = capacity;
     aligner->max_scores = aligned_alloc(32, sizeof(score_t) * vector_size);
-    size_t mem_size = sizeof(score_t) * capacity * vector_size;
-    aligner->match_scores = aligned_alloc(32, mem_size);
-    aligner->gap_a_scores = aligned_alloc(32, mem_size);
-    aligner->gap_b_scores = aligned_alloc(32, mem_size);
+    size_t h_mem_size = sizeof(score_t) * aligner->score_width * vector_size;
+    size_t v_mem_size = sizeof(score_t) * aligner->score_height * vector_size;
+    aligner->prev_match_scores = aligned_alloc(32, h_mem_size);
+    aligner->curr_match_scores = aligned_alloc(32, h_mem_size);
+    aligner->prev_gap_a_scores = aligned_alloc(32, v_mem_size);
+    aligner->curr_gap_a_scores = aligned_alloc(32, v_mem_size);
+    aligner->prev_gap_b_scores = aligned_alloc(32, h_mem_size);
+    aligner->curr_gap_b_scores = aligned_alloc(32, h_mem_size);
 
     return aligner;
 }
 
 void aligner_destroy(aligner_t *aligner) {
-    if (aligner->capacity > 0) {
-        free(aligner->match_scores);
-        free(aligner->gap_a_scores);
-        free(aligner->gap_b_scores);
-    }
+    free(aligner->prev_match_scores);
+    free(aligner->curr_match_scores);
+    free(aligner->prev_gap_a_scores);
+    free(aligner->curr_gap_a_scores);
+    free(aligner->prev_gap_b_scores);
+    free(aligner->curr_gap_b_scores);
 }
 
 
-void alignment_print_matrices(const aligner_t *aligner) {
-    const score_t *match_scores = aligner->match_scores;
-    const score_t *gap_a_scores = aligner->gap_a_scores;
-    const score_t *gap_b_scores = aligner->gap_b_scores;
-
-    size_t i, j, b, vector_size;
-    vector_size = aligner->vector_size;
-
-
-    // Note: Yes, the indexing here is not cache friendly but it's fine, this code is only
-    // used to debug. So I rather not refactor it...
-    for (b = 0; b < vector_size; b++) {
-        printf("batch no: %zi/%zi,\n seq_a: %.*s,\nseq_b: %.*s\n",
-               b + 1, vector_size,
-               (int) aligner->score_width - 1, aligner->seq_a_str,
-               (int) strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
-
-        printf("\n");
-
-        printf("match_scores:\n");
-        for (j = 0; j < aligner->score_height; j++) {
-            printf("%3i:", (int) j);
-            for (i = 0; i < aligner->score_width; i++) {
-                printf("\t%3i", (int) match_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
-                //printf("\t%3i", (int)ARR_LOOKUP(match_scores, aligner->score_width, i, j));
-            }
-            putc('\n', stdout);
-        }
-        printf("gap_a_scores:\n");
-        for (j = 0; j < aligner->score_height; j++) {
-            printf("%3i:", (int) j);
-            for (i = 0; i < aligner->score_width; i++) {
-                printf("\t%3i", (int) gap_a_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
-            }
-            putc('\n', stdout);
-        }
-        printf("gap_b_scores:\n");
-        for (j = 0; j < aligner->score_height; j++) {
-            printf("%3i:", (int) j);
-            for (i = 0; i < aligner->score_width; i++) {
-                printf("\t%3i", (int) gap_b_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
-            }
-            putc('\n', stdout);
-        }
-
-        printf("match: %i mismatch: %i gapopen: %i gapexend: %i\n",
-               aligner->scoring->match, aligner->scoring->mismatch,
-               aligner->scoring->gap_open, aligner->scoring->gap_extend);
-        printf("\n");
-    }
-}
+// void alignment_print_matrices(const aligner_t *aligner) {
+//     const score_t *match_scores = aligner->match_scores;
+//     const score_t *gap_a_scores = aligner->gap_a_scores;
+//     const score_t *gap_b_scores = aligner->gap_b_scores;
+//
+//     size_t i, j, b, vector_size;
+//     vector_size = aligner->vector_size;
+//
+//
+//     // Note: Yes, the indexing here is not cache friendly but it's fine, this code is only
+//     // used to debug. So I rather not refactor it...
+//     for (b = 0; b < vector_size; b++) {
+//         printf("batch no: %zi/%zi,\n seq_a: %.*s,\nseq_b: %.*s\n",
+//                b + 1, vector_size,
+//                (int) aligner->score_width - 1, aligner->seq_a_str,
+//                (int) strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);
+//
+//         printf("\n");
+//
+//         printf("match_scores:\n");
+//         for (j = 0; j < aligner->score_height; j++) {
+//             printf("%3i:", (int) j);
+//             for (i = 0; i < aligner->score_width; i++) {
+//                 printf("\t%3i", (int) match_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
+//                 //printf("\t%3i", (int)ARR_LOOKUP(match_scores, aligner->score_width, i, j));
+//             }
+//             putc('\n', stdout);
+//         }
+//         printf("gap_a_scores:\n");
+//         for (j = 0; j < aligner->score_height; j++) {
+//             printf("%3i:", (int) j);
+//             for (i = 0; i < aligner->score_width; i++) {
+//                 printf("\t%3i", (int) gap_a_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
+//             }
+//             putc('\n', stdout);
+//         }
+//         printf("gap_b_scores:\n");
+//         for (j = 0; j < aligner->score_height; j++) {
+//             printf("%3i:", (int) j);
+//             for (i = 0; i < aligner->score_width; i++) {
+//                 printf("\t%3i", (int) gap_b_scores[ARR_3D_index(aligner->score_width, FULL_VECTOR_SIZE, j, i, b)]);
+//             }
+//             putc('\n', stdout);
+//         }
+//
+//         printf("match: %i mismatch: %i gapopen: %i gapexend: %i\n",
+//                aligner->scoring->match, aligner->scoring->mismatch,
+//                aligner->scoring->gap_open, aligner->scoring->gap_extend);
+//         printf("\n");
+//     }
+// }

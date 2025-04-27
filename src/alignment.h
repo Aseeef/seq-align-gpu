@@ -30,11 +30,13 @@ typedef struct
     char *seq_a_fasta, **seq_b_fasta_batch;  // Pointers to the FASTA names
     size_t vector_size;                // the batch size of b
     size_t score_width, score_height; // Matrix dimensions: width = len(seq_a)+1, height = len(seq_b_batch[i])+1
-    score_t *match_scores;        // Full match/mismatch matrix (score for aligning A[i] with B[j])
-    score_t *gap_a_scores;        // Matrix for gap penalties in sequence A (inserts in B)
-    score_t *gap_b_scores;        // Matrix for gap penalties in sequence B (inserts in A)
+    score_t *prev_match_scores;        // Match/mismatch array from previous row
+    score_t *curr_match_scores;        // Match/mismatch array from current row
+    score_t *prev_gap_a_scores;        //
+    score_t *curr_gap_a_scores;        //
+    score_t *prev_gap_b_scores;        //
+    score_t *curr_gap_b_scores;        //
     score_t *max_scores;            // the max score of the best local alignment found
-    size_t capacity;              // Current allocated matrix size (score_width * score_height)
 } aligner_t;
 
 #define MATRIX_NAME(x) ((x) == MATCH ? "MATCH" : ((x) == GAP_A ? "GAP_A" : "GAP_B"))
