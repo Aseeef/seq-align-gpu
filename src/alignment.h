@@ -30,11 +30,8 @@ typedef struct
     char *seq_a_fasta, **seq_b_fasta_batch;  // Pointers to the FASTA names
     size_t vector_size;                // the batch size of b
     size_t score_width, score_height; // Matrix dimensions: width = len(seq_a)+1, height = len(seq_b_batch[i])+1
-    score_t *prev_match_scores;        // Match/mismatch array from previous row
     score_t *curr_match_scores;        // Match/mismatch array from current row
-    score_t *prev_gap_a_scores;        //
     score_t *curr_gap_a_scores;        //
-    score_t *prev_gap_b_scores;        //
     score_t *curr_gap_b_scores;        //
     score_t *max_scores;            // the max score of the best local alignment found
 } aligner_t;
