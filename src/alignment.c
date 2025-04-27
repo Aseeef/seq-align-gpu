@@ -299,7 +299,7 @@ void alignment_print_matrices(const aligner_t *aligner) {
     // Note: Yes, the indexing here is not cache friendly but it's fine, this code is only
     // used to debug. So I rather not refactor it...
     for (b = 0; b < vector_size; b++) {
-        printf("(batch no: %zi/%zi, seq_a: %.*s\nseq_b: %.*s\n",
+        printf("batch no: %zi/%zi,\n seq_a: %.*s,\nseq_b: %.*s\n",
                b + 1, vector_size,
                (int) aligner->score_width - 1, aligner->seq_a_str,
                (int) strlen(aligner->seq_b_str_batch[b]), aligner->seq_b_str_batch[b]);

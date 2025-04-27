@@ -512,6 +512,17 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
                     scoring);
             }
 
+            // TODO DEBUG
+            // printf("Batch\n");
+            // for (int j = 0; j < max_seq_len_in_vec; j++) {
+            //     for (int k = 0; k < VECTOR_SIZE; k++) {
+            //         size_t ind = VECTOR_SIZE * j + k;
+            //         printf("%c,", index_to_letters(aligners[0]->seq_b_batch_indexes[ind]));
+            //     }
+            //     printf("\n");
+            // }
+            // exit(1);
+
             // reset variables for the next vector batch
             len_set = false;
             vec_elem_cnt = 0;
