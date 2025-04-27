@@ -1,0 +1,1 @@
+python tests.py --original_cmd ./smith_waterman --modified_cmd ../bin/smith_waterman ../database/query.fasta ../database/test-db.fasta ../scoring/PAM250.txt
