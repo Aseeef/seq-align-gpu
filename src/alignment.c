@@ -176,20 +176,11 @@ void alignment_fill_matrices(aligner_t *aligner) {
             // H[i][j] = MAX(0, H[i-1][j-1] + substitution_penalty, F[i-1][j-1] + substitution_penalty, E[i-1][j-1] + substitution_penalty)
 
             __m256i match_score = _mm256_load_si256((__m256i *) (prev_match_scores + index_upleft));
-            if (seq_i == 0 || seq_j == 0)
-                // match score should be zero
-                assert(_mm256_testz_si256(match_score, match_score));
             match_score = _mm256_add_epi16(match_score, substitution_penalty);
 
             __m256i gap_a_score = _mm256_load_si256((__m256i *) (prev_gap_a_scores + index_upleft));
-            if (seq_i == 0 || seq_j == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(gap_a_score, gap_a_score));
             gap_a_score = _mm256_add_epi16(gap_a_score, substitution_penalty);
             __m256i gap_b_score = _mm256_load_si256((__m256i *) (prev_gap_b_scores + index_upleft));
-            if (seq_i == 0 || seq_j == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(gap_b_score, gap_b_score));
             gap_b_score = _mm256_add_epi16(gap_b_score, substitution_penalty);
 
             __m256i max_ab = _mm256_max_epi16(gap_a_score, gap_b_score);
@@ -215,19 +206,10 @@ void alignment_fill_matrices(aligner_t *aligner) {
             //                         min);
             // E[i][j] = MAX( 0, H[i-1][j] + gap_open_penalty, E[i-1][j] + gap_extend_penalty , F[i-1][j] + gap_open_penalty )
             match_score = _mm256_load_si256((__m256i *) (prev_match_scores + index_up));
-            if (seq_j == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(match_score, match_score));
             match_score = _mm256_add_epi16(match_score, gap_open_penalty);
             gap_a_score = _mm256_load_si256((__m256i *) (prev_gap_a_scores + index_up));
-            if (seq_j == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(gap_a_score, gap_a_score));
             gap_a_score = _mm256_add_epi16(gap_a_score, gap_extend_penalty);
             gap_b_score = _mm256_load_si256((__m256i *) (prev_gap_b_scores + index_up));
-            if (seq_j == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(gap_b_score, gap_b_score));
             gap_b_score = _mm256_add_epi16(gap_b_score, gap_open_penalty);
             gap_a_score = _mm256_max_epi16(gap_a_score, match_score);
             gap_a_score = _mm256_max_epi16(gap_a_score, gap_b_score);
@@ -242,19 +224,10 @@ void alignment_fill_matrices(aligner_t *aligner) {
             //                         min);
             // F[i][j] = MAX( 0, H[i][j-1] + gap_open_penalty, E[i][j-1] + gap_open_penalty , F[i][j-1] + gap_extend_penalty )
             match_score = _mm256_load_si256((__m256i *) (curr_match_scores + index_left));
-            if (seq_i == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(match_score, match_score));
             match_score = _mm256_add_epi16(match_score, gap_open_penalty);
             gap_a_score = _mm256_load_si256((__m256i *) (curr_gap_a_scores + index_left));
-            if (seq_i == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(gap_a_score, gap_a_score));
             gap_a_score = _mm256_add_epi16(gap_a_score, gap_open_penalty);
             gap_b_score = _mm256_load_si256((__m256i *) (curr_gap_b_scores + index_left));
-            if (seq_i == 0)
-                // match score should be zero
-                    assert(_mm256_testz_si256(gap_b_score, gap_b_score));
             gap_b_score = _mm256_add_epi16(gap_b_score, gap_extend_penalty);
             gap_b_score = _mm256_max_epi16(gap_b_score, match_score);
             gap_b_score = _mm256_max_epi16(gap_b_score, gap_a_score);
