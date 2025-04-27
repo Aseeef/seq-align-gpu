@@ -365,20 +365,12 @@ static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
                : seq_dopen(fileno(stdin), false, false, 0);
 }
 
-// 35213*12=422556
-// (35k is largest protein)
-// 12 is largest score you can get per match
-// so 422k is the largest score possible.
-// so I NEED AN INT
-// AVX can hold 32 bytes
-// ints are 4 bytes.
-// so we got 8 slots for the batch
-#define VECTOR_SIZE 32
 #define BATCH_SIZE 1
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
                              void (align)(aligner_t * aligner, size_t total_cnt),
                              bool use_zlib) {
+    size_t VECTOR_SIZE = 32 / sizeof(score_t);
     seq_file_t *query_file, *db_file;
     struct timespec time_start, time_stop;
     size_t i;
@@ -459,12 +451,15 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
         if (!len_set) {
             len_set = true;
+            // since db is sorted from longest to shortest, first item in batch
+            // will always be the longest.
             max_seq_len_in_vec = seq_b_len;
             db_seq_index_vec_batch = aligned_alloc(32, max_seq_len_in_vec * VECTOR_SIZE * sizeof(int32_t));
             db_seq_vec_batch = malloc(sizeof(char *) * VECTOR_SIZE);
             db_fasta_vec_batch = malloc(sizeof(char *) * VECTOR_SIZE);
         }
 
+        assert(max_seq_len_in_vec >= seq_b_len);
         assert(db_seq_index_vec_batch != NULL);
         assert(db_seq_vec_batch != NULL);
         assert(db_fasta_vec_batch != NULL);
@@ -525,6 +520,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             batch_cnt++;
 
             if (batch_cnt == BATCH_SIZE) {
+
                 clock_gettime(CLOCK_REALTIME, &time_start);
 
 //#pragma omp parallel for schedule(static, 1)
