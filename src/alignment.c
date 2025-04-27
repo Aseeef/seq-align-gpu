@@ -31,8 +31,11 @@ inline static __m256i scoring_lookup(const scoring_t *scoring, int32_t a_index, 
     // base address (the row) of the swap_scores for a_index
     const int32_t *swap_scores = scoring->swap_scores[a_index];
 
-    __m256i idx_low = _mm256_loadu_si256((__m256i *) b_indexes); // Use loadu for potentially unaligned access
-    __m256i idx_high = _mm256_loadu_si256((__m256i *) (b_indexes + 8));
+    // Load the indices for the batch
+    // must load two since simd batch is 16, and
+    // simd gather cant be used with shorts
+    __m256i idx_low = _mm256_load_si256((__m256i *) b_indexes);
+    __m256i idx_high = _mm256_load_si256((__m256i *) (b_indexes + 8));
 
     // gather the scores from the swap_scores array
     // need two, since batch has 16, 256-bit register can hold only 8
@@ -126,17 +129,20 @@ void alignment_fill_matrices(aligner_t *aligner) {
     size_t next_a_index;
     // int index = (h * width + w) * batch_size;
     for (seq_j = 0; seq_j < len_j; seq_j++) {
-        for (seq_i = 0; seq_i < len_i; seq_i++) {char const *prefetch_addr;
+        for (seq_i = 0; seq_i < len_i; seq_i++) {
+
+            char const *prefetch_addr;
             if (seq_i + 1 < len_i) {
-                next_a_index = aligner->seq_a_indexes[seq_i + 1];prefetch_addr =  (char const *) (scoring->swap_scores + next_a_index * 32);
+                next_a_index = aligner->seq_a_indexes[seq_i + 1];
+                prefetch_addr =  (char const *) (scoring->swap_scores + next_a_index * 32);
                 _mm_prefetch(prefetch_addr, _MM_HINT_T0);
                 _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
             } else if (seq_j + 1 < len_j) {
                 next_a_index = aligner->seq_a_indexes[0];
-            prefetch_addr = (char const *) (scoring->swap_scores + next_a_index * 32);
-
-            _mm_prefetch(prefetch_addr, _MM_HINT_T0);
-            _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);}
+                prefetch_addr = (char const *) (scoring->swap_scores + next_a_index * 32);
+                _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+                _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
+            }
 
             // substitution penalty
             __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i],
