@@ -59,9 +59,7 @@ char* cmdline_get_file2(cmdline_t* cmd);
 
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
-                              void (align)(size_t batch_size, char * query, char ** db_batch,
-                                           int32_t * query_indexes, int32_t * db_seq_index_batch, size_t query_len, size_t batch_max_len,
-                                      const char *query_name, const char **db_name),
+                              void (align)(aligner_t * aligner, size_t total_cnt),
                               bool use_zlib);
 
 #endif

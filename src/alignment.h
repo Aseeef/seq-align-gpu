@@ -27,7 +27,8 @@ typedef struct
     const scoring_t* scoring;     // Scoring scheme used (match/mismatch/gap)
     int32_t *seq_a_indexes, *seq_b_batch_indexes;    // Pointers to input sequences A and B
     char *seq_a_str, **seq_b_str_batch;    // Pointers to input sequences A and B
-    size_t b_batch_size;                // the batch size of b
+    char *seq_a_fasta, **seq_b_fasta_batch;  // Pointers to the FASTA names
+    size_t vector_size;                // the batch size of b
     size_t score_width, score_height; // Matrix dimensions: width = len(seq_a)+1, height = len(seq_b_batch[i])+1
     score_t *match_scores;        // Full match/mismatch matrix (score for aligning A[i] with B[j])
     score_t *gap_a_scores;        // Matrix for gap penalties in sequence A (inserts in B)
@@ -54,11 +55,20 @@ extern "C" {
  *   len_a/b   - lengths of seq_a and seq_b
  *   scoring   - pointer to scoring scheme (match/mismatch/gaps)
  */
-void aligner_align(aligner_t *aligner,
-                   char *seq_a, char **seq_b_batch,
+void aligner_update(aligner_t *aligner,
+                   char *seq_a_str, char **seq_b_str_batch,
+                   char * seq_a_fasta, char **seq_b_fasta_batch,
                    int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
-                   size_t len_a, size_t len_b, size_t batch_size,
+                   size_t len_a, size_t len_b, size_t vector_size,
                    const scoring_t *scoring);
+
+aligner_t * aligner_create(char *seq_a_str, char **seq_b_str_batch,
+                   char * seq_a_fasta, char **seq_b_fasta_batch,
+                   int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
+                   size_t len_a, size_t len_b, size_t vector_size,
+                   const scoring_t *scoring);
+
+void alignment_fill_matrices(aligner_t * aligner);
 
 /**
  * Frees internal buffers used in the aligner.
@@ -66,7 +76,7 @@ void aligner_align(aligner_t *aligner,
 void aligner_destroy(aligner_t *aligner);
 
 // Printing
-void alignment_print_matrices(const aligner_t *aligner, size_t batch_size);
+void alignment_print_matrices(const aligner_t *aligner);
 
 #ifdef __cplusplus
 }
