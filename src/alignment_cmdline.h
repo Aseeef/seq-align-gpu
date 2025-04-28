@@ -22,7 +22,6 @@ typedef struct
   char *file_path1, *file_path2;
 
   // All values initially 0
-  bool case_sensitive;
   score_t match, mismatch, gap_open, gap_extend;
 
   // SW specific
@@ -39,8 +38,6 @@ typedef struct
   // General output
   bool print_fasta, print_pretty, print_colour;
 
-  // Pair of sequences to align
-  const char *seq1, *seq2;
 } cmdline_t;
 
 char parse_entire_score_t(char *str, score_t *result);
@@ -59,7 +56,7 @@ char* cmdline_get_file2(cmdline_t* cmd);
 
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
-                              void (align)(aligner_t * aligner, size_t total_cnt),
+                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
                               bool use_zlib);
 
 #endif
