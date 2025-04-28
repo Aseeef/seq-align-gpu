@@ -27,40 +27,14 @@
  * @param b_batch          DB batch of characters in the alignment
  * @return                 The scores for aligning a and the batch of b's.
  */
-inline static __m256i scoring_lookup(const scoring_t *scoring, int32_t a_index, int32_t *b_indexes) {
+inline static __m256i scoring_lookup(const scoring_t *scoring, int8_t a_index, int8_t *b_indexes) {
     // base address (the row) of the swap_scores for a_index
-    const int32_t *swap_scores = scoring->swap_scores[a_index];
-
-    // Load the indices for the batch
-    // must load two since simd batch is 16, and
-    // simd gather cant be used with shorts
-    __m256i idx_low = _mm256_load_si256((__m256i *) b_indexes);
-    __m256i idx_high = _mm256_load_si256((__m256i *) (b_indexes + 8));
-
-    // gather the scores from the swap_scores array
-    // need two, since batch has 16, 256-bit register can hold only 8
-    __m256i scores_low = _mm256_i32gather_epi32(swap_scores, idx_low, 4);
-    __m256i scores_high = _mm256_i32gather_epi32(swap_scores, idx_high, 4);
-
-    // This part is cursed. To see what the problem is see:
-    // https://stackoverflow.com/questions/67979078/mm256-packs-epi32-except-pack-sequentially
-
-    // Pack the 32-bit integers into 16-bit integers with signed saturation.
-    // Output layout: [s0..3, s8..11 | s4..7, s12..15] (interleaved across 128-bit lanes)
-    __m256i packed_interleaved = _mm256_packs_epi32(scores_low, scores_high);
-
-    // This solution to the above problem was suggested by Gemini Pro 2.5.
-    // Prompt: https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221-Vbs7o7xRHvi1D2gWGdpiWL0vUtobbdp%22%5D,%22action%22:%22open%22,%22userId%22:%22112153521177605316268%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing
-
-    // Permute the 64-bit blocks to fix the order.
-    // Input chunks:  [0]      [1]      [2]      [3]
-    // Input data:    [s0..3]  [s8..11] [s4..7]  [s12..15]
-    // Desired order: [0]      [2]      [1]      [3]
-    // Desired data:  [s0..3]  [s4..7]  [s8..11] [s12..15] == [s0..7 | s8..15]
-    // The control 0xD8 (binary 11 01 10 00) selects input lanes [0, 2, 1, 3] for output.
-    __m256i final_packed = _mm256_permute4x64_epi64(packed_interleaved, 0xD8);
-
-    return final_packed;
+    const int8_t *swap_scores = scoring->swap_scores[a_index];
+    alignas(32) int16_t indexes[16];
+    for (int32_t i = 0; i < 16; i++) {
+        indexes[i] = (int16_t) swap_scores[b_indexes[i]];
+    }
+    return _mm256_load_si256((__m256i *) indexes);
 }
 
 const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
@@ -124,18 +98,11 @@ void alignment_fill_matrices(aligner_t *aligner) {
         index = FULL_VECTOR_SIZE; // Start calculating column 1
 
         for (seq_i = 0; seq_i < len_i; seq_i++) {
-            char const *prefetch_addr;
-            if (seq_i + 1 < len_i) {
-                next_a_index = aligner->seq_a_indexes[seq_i + 1];
-                prefetch_addr = (char const *) (scoring->swap_scores + next_a_index * 32);
-                _mm_prefetch(prefetch_addr, _MM_HINT_T0);
-                _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
-            } else if (seq_j + 1 < len_j) {
-                next_a_index = aligner->seq_a_indexes[0];
-                prefetch_addr = (char const *) (scoring->swap_scores + next_a_index * 32);
-                _mm_prefetch(prefetch_addr, _MM_HINT_T0);
-                _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
-            }
+            char const* prefetch_addr = (char const*)scoring->swap_scores;
+            _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+            _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
+            _mm_prefetch(prefetch_addr + 128, _MM_HINT_T0);
+            _mm_prefetch(prefetch_addr + 192, _MM_HINT_T0);
 
             // substitution penalty
             __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i],
@@ -232,7 +199,7 @@ void alignment_fill_matrices(aligner_t *aligner) {
 void aligner_update(aligner_t *aligner,
                     char *seq_a_str, char **seq_b_str_batch,
                     char *seq_a_fasta, char **seq_b_fasta_batch,
-                    int32_t *seq_a_indexes, int32_t *seq_b_batch_indexes,
+                    int8_t *seq_a_indexes, int8_t *seq_b_batch_indexes,
                     size_t len_a, size_t len_b, size_t vector_size,
                     const scoring_t *scoring) {
     aligner->scoring = scoring;
@@ -249,7 +216,7 @@ void aligner_update(aligner_t *aligner,
 
 aligner_t *aligner_create(char *seq_a_str, char **seq_b_str_batch,
                           char *seq_a_fasta, char **seq_b_fasta_batch,
-                          int32_t *seq_a_indexes, int32_t *seq_b_batch_indexes,
+                          int8_t *seq_a_indexes, int8_t *seq_b_batch_indexes,
                           size_t len_a, size_t len_b, size_t vector_size,
                           const scoring_t *scoring) {
     aligner_t *aligner = malloc(sizeof(aligner_t));
