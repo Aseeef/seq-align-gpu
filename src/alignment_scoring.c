@@ -58,15 +58,16 @@ void scoring_init(scoring_t *scoring,
  * @param score            Score for the mutation (alignment between a and b).
  */
 void scoring_add_mutation(scoring_t *scoring, char a, char b, int score) {
-    size_t index_a = letters_to_index(a);
-    size_t index_b = letters_to_index(b);
-    scoring->swap_scores[index_a][index_b] = score;
+    assert(score > -128 && score < 128);
+    char index_a = letters_to_index(a);
+    char index_b = letters_to_index(b);
+    scoring->swap_scores[(int) index_a][(int) index_b] = score;
     set_swap_bit(scoring, index_a, index_b);
     scoring->min_penalty = MIN2(scoring->min_penalty, score);
     scoring->max_penalty = MAX2(scoring->max_penalty, score);
 }
 
-int letters_to_index(char c) {
+char letters_to_index(char c) {
     if (c >= 97 && c < 123) {
         return c - 96;
     } else if (c >= 65 && c < 91) {
@@ -79,7 +80,7 @@ int letters_to_index(char c) {
     }
 }
 
-char index_to_letters(int c) {
+char index_to_letters(char c) {
     if (c >= 1 && c < 27) {
         return c + 64;
     } else if (c == 31) {
