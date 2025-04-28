@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <limits.h> // INT_MIN
 #include <stdarg.h> // for va_list
+#include <time.h>
 
 #include "seq_file/seq_file.h"
 
@@ -385,6 +386,17 @@ static seq_file_t* open_seq_file(const char *path, bool use_zlib)
                                              : seq_dopen(fileno(stdin), false, false, 0);
 }
 
+static double interval(struct timespec start, struct timespec end) {
+  struct timespec temp;
+  temp.tv_sec = end.tv_sec - start.tv_sec;
+  temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+  if (temp.tv_nsec < 0) {
+    temp.tv_sec = temp.tv_sec - 1;
+    temp.tv_nsec = temp.tv_nsec + 1000000000;
+  }
+  return (((double) temp.tv_sec) + ((double) temp.tv_nsec) * 1.0e-9);
+}
+
 void align_from_query_and_db(const char *query_path, const char *db_path,
                      void (align)(const char *query_seq, const char *db_seq,
                                   const char *query_name, const char *db_name),
@@ -423,16 +435,23 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
         return;
     }
 
+    struct timespec time_start, time_stop;
+    double total_time = 0;
     // Read database sequences and align each with the query
     read_t db_read;
     seq_read_alloc(&db_read);
 
     while(seq_read(db_file, &db_read) > 0)
     {
+        clock_gettime(CLOCK_REALTIME, &time_start);
         align(query_read.seq.b, db_read.seq.b,
               (query_read.name.end == 0 ? NULL : query_read.name.b),
               (db_read.name.end == 0 ? NULL : db_read.name.b));
+        clock_gettime(CLOCK_REALTIME, &time_stop);
+        total_time += interval(time_start, time_stop);
     }
+
+    printf("Total time: %f\n", total_time);
 
     // Close files and free memory
     seq_close(query_file);
