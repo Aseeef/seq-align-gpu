@@ -14,8 +14,8 @@ from statistics import mean
 # Configuration
 executables_dir = '../executables'
 command_args = ['--substitution_matrix', '../scoring/PAM250.txt', '--files', '../database/query.fasta', '../database/database.fasta']
-ome_thresholds = [1, 2, 4, 8, 16, 32]
-repeats = 5
+ome_thresholds = [1, 2, 4, 8, 16, 32, 64]
+repeats = 6
 
 def run_benchmark(executable_path, omp_threads=None):
     times = []
@@ -23,7 +23,7 @@ def run_benchmark(executable_path, omp_threads=None):
     if omp_threads is not None:
         env['OMP_NUM_THREADS'] = str(omp_threads)
 
-    for _ in tqdm(range(repeats), desc=executable_path.split("/")[-1]):
+    for _ in tqdm(range(repeats), desc=executable_path.split("/")[-1] + ("" if omp_threads is None else f" (OMP_NUM_THREADS={omp_threads})")):
         try:
             result = subprocess.run([executable_path] + command_args, capture_output=True, text=True, env=env, check=True)
             match = re.search(r'Total time: ([0-9]*\.?[0-9]+)', result.stdout)
