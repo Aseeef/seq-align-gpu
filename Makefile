@@ -1,6 +1,6 @@
 LIBS_PATH=libs
 
-DEBUG=1
+#DEBUG=1
 
 ifdef DEBUG
 	OPT = -O0 -g -ggdb
