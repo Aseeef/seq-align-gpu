@@ -304,9 +304,9 @@ cmdline_t *cmdline_new(int argc, char **argv, scoring_t *scoring,
         usage("Match value should not be less than mismatch penalty");
     }
 
-  if (cmd->file_path1 == NULL || cmd->file_path2 == NULL) {
-    usage("No input specified");
-  }
+    if (cmd->file_path1 == NULL || cmd->file_path2 == NULL) {
+        usage("No input specified");
+    }
 
     return cmd;
 }
@@ -344,7 +344,7 @@ static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
 
 #define BATCH_SIZE 1
 
-void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
+void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
                              bool use_zlib) {
     size_t VECTOR_SIZE = 32 / sizeof(score_t);
@@ -419,7 +419,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     size_t max_seq_len_in_vec = 0;
 
     double total_time = 0;
-
 
     int read_status = seq_read(db_file, &db_read);
     while (read_status > 0) {
@@ -525,7 +524,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             }
 
         }
-
     }
 
     printf("Total time: %f\n", total_time);
