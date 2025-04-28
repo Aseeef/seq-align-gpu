@@ -14,7 +14,7 @@ from statistics import mean, stdev
 # Configuration
 executables_dir = '../executables'
 command_args = ['--substitution_matrix', '../scoring/PAM250.txt', '--files', '../database/query.fasta', '../database/database.fasta']
-ome_thresholds = [1, 2, 4, 8, 16, 32, 64]
+ome_thresholds = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 repeats = 6
 
 def run_benchmark(executable_path, omp_threads=None):

@@ -18,6 +18,7 @@
 #include <limits.h> // INT_MIN
 #include <stdarg.h> // for va_list
 #include <time.h>
+#include <omp.h>
 
 #include "seq_file/seq_file.h"
 
@@ -342,11 +343,14 @@ static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
                : seq_dopen(fileno(stdin), false, false, 0);
 }
 
-#define BATCH_SIZE 1024
+#define BATCH_SIZE_FACTOR 64
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
                              bool use_zlib) {
+    int num_threads = omp_get_max_threads();
+    int max_batch_size = num_threads * BATCH_SIZE_FACTOR;
+
     size_t VECTOR_SIZE = 32 / sizeof(score_t);
     seq_file_t *query_file, *db_file;
     struct timespec time_start, time_stop;
@@ -401,9 +405,9 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     seq_read_alloc(&db_read);
 
     // Allocate aligners
-    aligner_t *aligners[BATCH_SIZE];
+    aligner_t **aligners = malloc(sizeof(aligner_t*) * max_batch_size);
     // Init aligners to null
-    for (i = 0; i < BATCH_SIZE; i++) {
+    for (i = 0; i < max_batch_size; i++) {
         aligners[i] = NULL;
     }
 
@@ -499,7 +503,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             // increment batch
             batch_cnt++;
 
-            if (batch_cnt == BATCH_SIZE || read_status <= 0) {
+            if (batch_cnt == max_batch_size || read_status <= 0) {
 
                 clock_gettime(CLOCK_REALTIME, &time_start);
 #pragma omp parallel for schedule(static, 1)
@@ -535,4 +539,5 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     seq_read_dealloc(&query_read);
     seq_read_dealloc(&db_read);
     free(query_indexes);
+    free(aligners);
 }
