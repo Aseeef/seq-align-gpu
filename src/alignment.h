@@ -25,7 +25,7 @@
 typedef struct
 {
     const scoring_t* scoring;     // Scoring scheme used (match/mismatch/gap)
-    int8_t *seq_a_indexes, *seq_b_batch_indexes;    // Pointers to input sequences A and B
+    int32_t *seq_a_indexes, *seq_b_batch_indexes;    // Pointers to input sequences A and B
     char *seq_a_str, **seq_b_str_batch;    // Pointers to input sequences A and B
     char *seq_a_fasta, **seq_b_fasta_batch;  // Pointers to the FASTA names
     size_t vector_size;                // the batch size of b
@@ -58,13 +58,13 @@ extern "C" {
 void aligner_update(aligner_t *aligner,
                    char *seq_a_str, char **seq_b_str_batch,
                    char * seq_a_fasta, char **seq_b_fasta_batch,
-                   int8_t * seq_a_indexes, int8_t * seq_b_batch_indexes,
+                   int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
                    size_t len_a, size_t len_b, size_t vector_size,
                    const scoring_t *scoring);
 
 aligner_t * aligner_create(char *seq_a_str, char **seq_b_str_batch,
                    char * seq_a_fasta, char **seq_b_fasta_batch,
-                   int8_t * seq_a_indexes, int8_t * seq_b_batch_indexes,
+                   int32_t * seq_a_indexes, int32_t * seq_b_batch_indexes,
                    size_t len_a, size_t len_b, size_t vector_size,
                    const scoring_t *scoring);
 

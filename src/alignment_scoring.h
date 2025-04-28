@@ -31,7 +31,7 @@ typedef struct
   // Array of characters that match to everything with the same penalty (i.e. 'N's)
   uint32_t swap_set[32];
   // The penalty or the reward for a match/mismatch between two characters.
-  alignas(32) int8_t swap_scores[32][32];  // swap scores int32_t for better simd
+  alignas(32) int32_t swap_scores[32][32];  // swap scores int32_t for better simd
 
   int min_penalty, max_penalty; // min, max {match/mismatch,gapopen etc.}
 } scoring_t;

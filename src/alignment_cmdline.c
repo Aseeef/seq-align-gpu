@@ -386,7 +386,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     size_t query_seq_len = query_read.seq.end;
     assert(query_seq_len > 0);
     // characters are converted into indexes for table lookup
-    int8_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int8_t));
+    int32_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int32_t));
 
     // Replace unknown characters in query with an X
     for(i = 0; i < query_seq_len; i++) {
@@ -407,7 +407,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
         aligners[i] = NULL;
     }
 
-    int8_t *db_seq_index_vec_batch = NULL;
+    int32_t *db_seq_index_vec_batch = NULL;
     char **db_seq_vec_batch = NULL;
     char **db_fasta_vec_batch = NULL;
     size_t vec_elem_cnt = 0;
@@ -433,7 +433,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             // since db is sorted from longest to shortest, first item in batch
             // will always be the longest.
             max_seq_len_in_vec = seq_b_len;
-            db_seq_index_vec_batch = aligned_alloc(32, max_seq_len_in_vec * VECTOR_SIZE * sizeof(int8_t));
+            db_seq_index_vec_batch = aligned_alloc(32, max_seq_len_in_vec * VECTOR_SIZE * sizeof(int32_t));
             db_seq_vec_batch = malloc(sizeof(char *) * VECTOR_SIZE);
             db_fasta_vec_batch = malloc(sizeof(char *) * VECTOR_SIZE);
         }
