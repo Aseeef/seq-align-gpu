@@ -78,10 +78,7 @@ void alignment_fill_matrices(aligner_t *aligner) {
         _mm256_store_si256((__m256i *) (curr_gap_a_scores + offset), min_v);
     }
 
-    index = FULL_VECTOR_SIZE; // in curr scores
-    index_right = (2 * FULL_VECTOR_SIZE); // in curr scores
 
-    // int index = (h * width + w) * batch_size;
     for (seq_j = 0; seq_j < len_j; seq_j++) {
 
         // init these to zeros since we know the the left boundary is all zeros
@@ -95,9 +92,12 @@ void alignment_fill_matrices(aligner_t *aligner) {
 
         // Indices (relative to the single row buffer)
         index = FULL_VECTOR_SIZE; // Start calculating column 1
+        index_right = (2 * FULL_VECTOR_SIZE);
 
         for (seq_i = 0; seq_i < len_i; seq_i++) {
-            // Make sure to keep the entire table fetched at all times
+
+            // Make sure to keep the entire table fetched at all times by prefetching
+            // everytime the inner loop finishes
             char const* prefetch_addr = (char const*)scoring->swap_scores;
             _mm_prefetch(prefetch_addr, _MM_HINT_T0);
             _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);

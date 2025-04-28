@@ -342,7 +342,7 @@ static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
                : seq_dopen(fileno(stdin), false, false, 0);
 }
 
-#define BATCH_SIZE 1
+#define BATCH_SIZE 1024
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
@@ -419,7 +419,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     size_t max_seq_len_in_vec = 0;
 
     double total_time = 0;
-
 
     int read_status = seq_read(db_file, &db_read);
     while (read_status > 0) {
@@ -502,10 +501,13 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
             if (batch_cnt == BATCH_SIZE || read_status <= 0) {
 
-            clock_gettime(CLOCK_REALTIME, &time_start);
-
+                clock_gettime(CLOCK_REALTIME, &time_start);
 #pragma omp parallel for schedule(static, 1)
-                for (i = 0; i < BATCH_SIZE; i++) {
+                for (i = 0; i < batch_cnt; i++) {
+                    alignment_fill_matrices(aligners[i]);
+                }
+                clock_gettime(CLOCK_REALTIME, &time_stop);
+                total_time += interval(time_start, time_stop);
 
                 for (i = 0; i < batch_cnt; i++) {
                     print_alignment(aligners[i], total_cnt - (batch_cnt * VECTOR_SIZE) + (i * VECTOR_SIZE));
@@ -523,7 +525,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             }
 
         }
-
     }
 
     printf("Total time: %f\n", total_time);
