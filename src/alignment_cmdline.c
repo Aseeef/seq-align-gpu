@@ -18,6 +18,7 @@
 #include <limits.h> // INT_MIN
 #include <stdarg.h> // for va_list
 #include <time.h>
+#include <omp.h>
 
 #include "seq_file/seq_file.h"
 
@@ -247,82 +248,82 @@ cmdline_t *cmdline_new(int argc, char **argv, scoring_t *scoring,
                     usage("Invalid --match argument ('%s') must be an int", argv[argi+1]);
                 }
 
-        match_set = true;
-        argi++; // took an argument
+                match_set = true;
+                argi++; // took an argument
             } else if (strcasecmp(argv[argi], "--mismatch") == 0) {
                 if (!parse_entire_int(argv[argi + 1], &scoring->mismatch)) {
-          usage("Invalid --mismatch argument ('%s') must be an int", argv[argi+1]);
-        }
+                    usage("Invalid --mismatch argument ('%s') must be an int", argv[argi+1]);
+                }
 
-        mismatch_set = true;
-        argi++; // took an argument
+                mismatch_set = true;
+                argi++; // took an argument
             } else if (strcasecmp(argv[argi], "--gapopen") == 0) {
                 if (!parse_entire_score_t(argv[argi + 1], &scoring->gap_open)) {
-          usage("Invalid --gapopen argument ('%s') must be an int", argv[argi+1]);
-        }
+                    usage("Invalid --gapopen argument ('%s') must be an int", argv[argi+1]);
+                }
 
-        argi++; // took an argument
+                argi++; // took an argument
             } else if (strcasecmp(argv[argi], "--gapextend") == 0) {
                 if (!parse_entire_score_t(argv[argi + 1], &scoring->gap_extend)) {
-          usage("Invalid --gapextend argument ('%s') must be an int",
-                argv[argi+1]);
-        }
+                    usage("Invalid --gapextend argument ('%s') must be an int",
+                          argv[argi+1]);
+                }
 
-        argi++; // took an argument
+                argi++; // took an argument
             } else if (strcasecmp(argv[argi], "--file") == 0) {
-        cmdline_set_files(cmd, argv[argi+1], NULL);
-        argi++; // took an argument
-      }
-      // Remaining options take two arguments but check themselves
+                cmdline_set_files(cmd, argv[argi + 1], NULL);
+                argi++; // took an argument
+            }
+            // Remaining options take two arguments but check themselves
             else if (strcasecmp(argv[argi], "--files") == 0) {
-          printf("Query File=%s and Database File=%s\n", argv[argi+1], argv[argi+2]);
+                printf("Query File=%s and Database File=%s\n", argv[argi + 1], argv[argi + 2]);
                 if (argi >= argc - 2) {
-          usage("--files option takes 2 arguments");
+                    usage("--files option takes 2 arguments");
                 } else if (strcmp(argv[argi + 1], "-") == 0 && strcmp(argv[argi + 2], "-") == 0) {
-          // Read both from stdin
-          cmdline_set_files(cmd, argv[argi+1], NULL);
+                    // Read both from stdin
+                    cmdline_set_files(cmd, argv[argi + 1], NULL);
                 } else {
-          cmdline_set_files(cmd, argv[argi+1], argv[argi+2]);
-        }
+                    cmdline_set_files(cmd, argv[argi + 1], argv[argi + 2]);
+                }
 
-        argi += 2; // took two arguments
+                argi += 2; // took two arguments
             } else
                 usage("Unknown argument '%s'", argv[argi]);
         } else {
             if (argc - argi != 2)
                 usage("Unknown options: '%s'", argv[argi]);
-      break;
+            break;
+        }
     }
-  }
 
     if (substitutions_set && !match_set) {
-    // if substitution table set and not match/mismatch
-    scoring->use_match_mismatch = 0;
-  }
+        // if substitution table set and not match/mismatch
+        scoring->use_match_mismatch = 0;
+    }
 
-  if(scoring->use_match_mismatch && scoring->match < scoring->mismatch) {
-    usage("Match value should not be less than mismatch penalty");
-  }
+    if (scoring->use_match_mismatch && scoring->match < scoring->mismatch) {
+        usage("Match value should not be less than mismatch penalty");
+    }
 
-  if (cmd->file_path1 == NULL || cmd->file_path2 == NULL) {
-    usage("No input specified");
-  }
+    if (cmd->file_path1 == NULL || cmd->file_path2 == NULL) {
+        usage("No input specified");
+    }
 
-  return cmd;
+    return cmd;
 }
 
 
 void cmdline_set_files(cmdline_t *cmd, char *query, char *database) {
-  cmd->file_path1 = query;
-  cmd->file_path2 = database;
+    cmd->file_path1 = query;
+    cmd->file_path2 = database;
 }
 
 char *cmdline_get_file1(cmdline_t *cmd) {
-  return cmd->file_path1;
+    return cmd->file_path1;
 }
 
 char *cmdline_get_file2(cmdline_t *cmd) {
-  return cmd->file_path2;
+    return cmd->file_path2;
 }
 
 static double interval(struct timespec start, struct timespec end) {
@@ -339,14 +340,17 @@ static double interval(struct timespec start, struct timespec end) {
 static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
     return (strcmp(path, "-") != 0 || use_zlib)
                ? seq_open(path)
-                                             : seq_dopen(fileno(stdin), false, false, 0);
+               : seq_dopen(fileno(stdin), false, false, 0);
 }
 
-#define BATCH_SIZE 1
+#define BATCH_SIZE_FACTOR 64
 
-void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
+void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
                              bool use_zlib) {
+    int num_threads = omp_get_max_threads();
+    int max_batch_size = num_threads * BATCH_SIZE_FACTOR;
+
     size_t VECTOR_SIZE = 32 / sizeof(score_t);
     seq_file_t *query_file, *db_file;
     struct timespec time_start, time_stop;
@@ -381,17 +385,17 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     }
 
     assert(query_read.name.end != 0);
-    char * query_seq = query_read.seq.b;
+    char *query_seq = query_read.seq.b;
     char *query_fasta = query_read.name.b;
     size_t query_seq_len = query_read.seq.end;
     assert(query_seq_len > 0);
     // characters are converted into indexes for table lookup
-    int8_t * query_indexes = aligned_alloc(32, query_seq_len * sizeof(int8_t));
+    int8_t *query_indexes = aligned_alloc(32, query_seq_len * sizeof(int8_t));
 
     // Replace unknown characters in query with an X
-    for(i = 0; i < query_seq_len; i++) {
+    for (i = 0; i < query_seq_len; i++) {
         query_indexes[i] = letters_to_index(query_seq[i]);
-        if(!get_swap_bit(scoring, query_indexes[i], query_indexes[i])) {
+        if (!get_swap_bit(scoring, query_indexes[i], query_indexes[i])) {
             query_indexes[i] = letters_to_index('X');
         }
     }
@@ -401,9 +405,9 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     seq_read_alloc(&db_read);
 
     // Allocate aligners
-    aligner_t *aligners[BATCH_SIZE];
+    aligner_t **aligners = malloc(sizeof(aligner_t*) * max_batch_size);
     // Init aligners to null
-    for (i = 0; i < BATCH_SIZE; i++) {
+    for (i = 0; i < max_batch_size; i++) {
         aligners[i] = NULL;
     }
 
@@ -420,12 +424,11 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
     double total_time = 0;
 
-
     int read_status = seq_read(db_file, &db_read);
     while (read_status > 0) {
         assert(db_read.name.end != 0);
 
-        char * seq_b = db_read.seq.b;
+        char *seq_b = db_read.seq.b;
         size_t seq_b_len = db_read.seq.end;
 
         if (!len_set) {
@@ -500,9 +503,10 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             // increment batch
             batch_cnt++;
 
-            if (batch_cnt == BATCH_SIZE || read_status <= 0) {
+            if (batch_cnt == max_batch_size || read_status <= 0) {
 
                 clock_gettime(CLOCK_REALTIME, &time_start);
+#pragma omp parallel for schedule(static, 1)
                 for (i = 0; i < batch_cnt; i++) {
                     alignment_fill_matrices(aligners[i]);
                 }
@@ -525,7 +529,6 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             }
 
         }
-
     }
 
     printf("Total time: %f\n", total_time);
@@ -536,4 +539,5 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     seq_read_dealloc(&query_read);
     seq_read_dealloc(&db_read);
     free(query_indexes);
+    free(aligners);
 }

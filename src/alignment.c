@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <omp.h>
 
 #include "alignment.h"
 #include "alignment_macros.h"
