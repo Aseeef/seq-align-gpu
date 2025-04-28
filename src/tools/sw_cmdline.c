@@ -35,23 +35,7 @@ static void sw_set_default_scoring(scoring_t * scoring) {
 }
 
 // Align two sequences against each other to find local alignments between them
-void align_batch(aligner_t * aligner, size_t total_cnt) {
-
-    // Check query has length > 0
-    if (aligner->seq_a_str[0] == '\0') {
-        fprintf(stderr, "Error: The query must have length > 0\n");
-        fflush(stderr);
-
-        if (cmd->print_fasta && aligner->seq_a_fasta != NULL) {
-            fprintf(stderr, "%s\n", aligner->seq_a_fasta);
-        }
-
-        fflush(stderr);
-
-        return;
-    }
-
-    alignment_fill_matrices(aligner);
+void print_alignment_info(aligner_t * aligner, size_t total_cnt) {
 
     if (cmd->print_matrices) {
         alignment_print_matrices(aligner);
@@ -104,7 +88,7 @@ int main(int argc, char *argv[]) {
     const char *db_file = cmdline_get_file2(cmd);
 
     if (query_file != NULL && db_file != NULL) {
-        align_from_query_and_db(query_file, db_file, &scoring, &align_batch, !cmd->interactive);
+        align_from_query_and_db(query_file, db_file, &scoring, &print_alignment_info, !cmd->interactive);
     } else {
         fprintf(stderr, "Error: Both query and database files must be provided\n");
         fflush(stderr);
