@@ -144,8 +144,6 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
         fprintf(stderr,
                 "    --minscore <score>   Minimum required score\n"
                 "                         [default: match * MAX(0.2 * length, 2)]\n"
-                "    --maxhits <hits>     Maximum number of results per alignment\n"
-                "                         [default: no limit]\n"
                 "\n"
                 "    --printseq           Print sequences before local alignments\n");
     }
@@ -180,8 +178,6 @@ void cmdline_free(cmdline_t *cmd) {
 cmdline_t *cmdline_new(int argc, char **argv, scoring_t *scoring,
                        enum SeqAlignCmdType cmd_type) {
     cmdline_t *cmd = calloc(1, sizeof(cmdline_t));
-    cmd->seq1 = cmd->seq2 = NULL;
-    // All values initially 0
 
     // Store defaults
     score_t defaults[4] = {
@@ -204,8 +200,6 @@ cmdline_t *cmdline_new(int argc, char **argv, scoring_t *scoring,
             strcasecmp(argv[argi], "-help") == 0 ||
             strcasecmp(argv[argi], "-h") == 0) {
             usage(NULL);
-        } else if (strcasecmp(argv[argi], "--case_sensitive") == 0) {
-            cmd->case_sensitive = 1;
         }
     }
 
@@ -242,22 +236,12 @@ cmdline_t *cmdline_new(int argc, char **argv, scoring_t *scoring,
                     usage("Couldn't read: %s", argv[argi+1]);
 
                 align_scoring_load_matrix(sub_matrix_file, argv[argi + 1],
-                                          scoring, cmd->case_sensitive);
+                                          scoring, true);
 
                 gzclose(sub_matrix_file);
                 substitutions_set = true;
 
                 argi++; // took an argument
-            } else if (strcasecmp(argv[argi], "--maxhits") == 0) {
-                if (cmd_type != SEQ_ALIGN_SW_CMD)
-                    usage("--maxhits only valid with Smith-Waterman");
-
-                if (!parse_entire_uint(argv[argi + 1], &cmd->max_hits_per_alignment))
-                    usage("Invalid --maxhits <hits> argument (must be a +ve int)");
-
-                cmd->max_hits_per_alignment_set = true;
-
-                argi++;
             } else if (strcasecmp(argv[argi], "--match") == 0) {
                 if (!parse_entire_int(argv[argi + 1], &scoring->match)) {
                     usage("Invalid --match argument ('%s') must be an int", argv[argi+1]);
@@ -320,14 +304,7 @@ cmdline_t *cmdline_new(int argc, char **argv, scoring_t *scoring,
         usage("Match value should not be less than mismatch penalty");
     }
 
-    // Check for extra unused arguments
-    // and set seq1 and seq2 if they have been passed
-    if (argi < argc) {
-        cmd->seq1 = argv[argi];
-        cmd->seq2 = argv[argi + 1];
-    }
-
-    if (cmd->seq1 == NULL && (cmd->file_path1 == NULL || cmd->file_path2 == NULL)) {
+    if (cmd->file_path1 == NULL || cmd->file_path2 == NULL) {
         usage("No input specified");
     }
 
@@ -368,7 +345,7 @@ static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
 #define BATCH_SIZE 1
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
-                             void (align)(aligner_t * aligner, size_t total_cnt),
+                             void (print_alignment)(aligner_t * aligner, size_t total_cnt),
                              bool use_zlib) {
     size_t VECTOR_SIZE = 32 / sizeof(score_t);
     seq_file_t *query_file, *db_file;
@@ -407,6 +384,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     char *query_seq = query_read.seq.b;
     char *query_fasta = query_read.name.b;
     size_t query_seq_len = query_read.seq.end;
+    assert(query_seq_len > 0);
     // characters are converted into indexes for table lookup
     int8_t *query_indexes = aligned_alloc(32, query_seq_len * sizeof(int8_t));
 
@@ -443,7 +421,8 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
     double total_time = 0;
 
 
-    while (seq_read(db_file, &db_read) > 0) {
+    int read_status = seq_read(db_file, &db_read);
+    while (read_status > 0) {
         assert(db_read.name.end != 0);
 
         char *seq_b = db_read.seq.b;
@@ -476,6 +455,8 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
         total_cnt++;
         vec_elem_cnt++;
+
+        read_status = seq_read(db_file, &db_read);
 
         if (vec_elem_cnt == VECTOR_SIZE) {
             assert(query_seq_len != 0);
@@ -519,56 +500,31 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             // increment batch
             batch_cnt++;
 
-            if (batch_cnt == BATCH_SIZE) {
+            if (batch_cnt == BATCH_SIZE || read_status <= 0) {
 
             clock_gettime(CLOCK_REALTIME, &time_start);
 
 #pragma omp parallel for schedule(static, 1)
                 for (i = 0; i < BATCH_SIZE; i++) {
 
-                    assert(aligners[i]->seq_b_fasta_batch != NULL);
-
-                    align(aligners[i], total_cnt - (BATCH_SIZE * VECTOR_SIZE) + (i * VECTOR_SIZE));
-
-                    // cleanup data specific to this batch
+                for (i = 0; i < batch_cnt; i++) {
+                    print_alignment(aligners[i], total_cnt - (batch_cnt * VECTOR_SIZE) + (i * VECTOR_SIZE));
+                    // cleanup data specific to this batch since it wont be needed again
                     free(aligners[i]->seq_b_batch_indexes);
                     free(aligners[i]->seq_b_str_batch);
                     free(aligners[i]->seq_b_fasta_batch);
-
                     aligners[i]->seq_b_batch_indexes = NULL;
                     aligners[i]->seq_b_str_batch = NULL;
                     aligners[i]->seq_b_fasta_batch = NULL;
                 }
 
-            clock_gettime(CLOCK_REALTIME, &time_stop);
-            total_time += interval(time_start, time_stop);
-
                 // reset batch cnt
                 batch_cnt = 0;
+            }
+
         }
 
     }
-    }
-
-
-    // TODO: worry about remainders later so process the remainder later
-    // if (batch_count != 0) {
-    //   clock_gettime(CLOCK_REALTIME, &time_start);
-    //   assert(query_read.name.end != 0);
-    //   // batch size, the char * query, the char ** batch, the query indexes, the optimized memory layout seq indexes
-    //   align(BATCH_SIZE, query_seq, db_seq_batch, query_indexes, db_seq_index_batch, query_seq_len, batch_max_len,
-    //         query_read.name.b,
-    //         (const char **) db_name_batch);
-    //   // reset variables for the next batch
-    //   batch_count = 0;
-    //   len_set = false;
-    //   free(db_seq_index_batch);
-    //   batch_max_len = 0;
-    //   clock_gettime(CLOCK_REALTIME, &time_stop);
-    //   total_time += interval(time_start, time_stop);
-    // }
-
-    // todo: remainder isn't processed ^
 
     printf("Total time: %f\n", total_time);
 
