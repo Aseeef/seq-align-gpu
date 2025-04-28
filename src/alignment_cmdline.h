@@ -15,7 +15,7 @@
 
 #include <stdarg.h> // required for va_list
 #include <stdbool.h>
-#include "seq_file/seq_file.h"
+#include "smith_waterman.h"
 #include "alignment.h"
 
 enum SeqAlignCmdType {SEQ_ALIGN_SW_CMD};
@@ -60,9 +60,9 @@ char* cmdline_get_file1(cmdline_t* cmd);
 char* cmdline_get_file2(cmdline_t* cmd);
 
 
-void align_from_query_and_db(const char *query_path, const char *db_path,
-                              void (align)(const char *query_seq, const char *db_seq,
-                                           const char *query_name, const char *db_name),
-                              bool use_zlib);
+void align_from_query_and_db(const char *query_path, const char *db_path, const scoring_t * scoring, sw_aligner_t * sw,
+                     void (print_alignment)(const char *query_seq, const char *db_seq,
+                                  const char *query_name, const char *db_name),
+                     bool use_zlib);
 
 #endif

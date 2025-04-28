@@ -23,6 +23,9 @@
 
 #include "alignment.h"
 #include "alignment_cmdline.h"
+
+#include <smith_waterman.h>
+
 #include "alignment_scoring_load.h"
 
 char parse_entire_int(char *str, int *result)
@@ -397,8 +400,8 @@ static double interval(struct timespec start, struct timespec end) {
   return (((double) temp.tv_sec) + ((double) temp.tv_nsec) * 1.0e-9);
 }
 
-void align_from_query_and_db(const char *query_path, const char *db_path,
-                     void (align)(const char *query_seq, const char *db_seq,
+void align_from_query_and_db(const char *query_path, const char *db_path, const scoring_t * scoring, sw_aligner_t * sw,
+                     void (print_alignment)(const char *query_seq, const char *db_seq,
                                   const char *query_name, const char *db_name),
                      bool use_zlib)
 {
@@ -444,11 +447,12 @@ void align_from_query_and_db(const char *query_path, const char *db_path,
     while(seq_read(db_file, &db_read) > 0)
     {
         clock_gettime(CLOCK_REALTIME, &time_start);
-        align(query_read.seq.b, db_read.seq.b,
-              (query_read.name.end == 0 ? NULL : query_read.name.b),
-              (db_read.name.end == 0 ? NULL : db_read.name.b));
+        smith_waterman_align(query_read.seq.b, db_read.seq.b, scoring, sw);
         clock_gettime(CLOCK_REALTIME, &time_stop);
         total_time += interval(time_start, time_stop);
+        print_alignment(query_read.seq.b, db_read.seq.b,
+                (query_read.name.end == 0 ? NULL : query_read.name.b),
+                (db_read.name.end == 0 ? NULL : db_read.name.b));
     }
 
     printf("Total time: %f\n", total_time);

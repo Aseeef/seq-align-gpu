@@ -44,7 +44,7 @@ static void sw_set_default_scoring() {
 }
 
 // Align two sequences against each other to find local alignments between them
-void align(const char *seq_a, const char *seq_b,
+void print_alignment(const char *seq_a, const char *seq_b,
            const char *seq_a_name, const char *seq_b_name) {
     if ((seq_a_name != NULL || seq_b_name != NULL) && wait_on_keystroke) {
         fprintf(stderr, "Error: Interactive input takes seq only "
@@ -125,7 +125,7 @@ void align(const char *seq_a, const char *seq_b,
 }
 
 void align_pair_from_file(read_t *read1, read_t *read2) {
-    align(read1->seq.b, read2->seq.b,
+    print_alignment(read1->seq.b, read2->seq.b,
           (read1->name.end == 0 ? NULL : read1->name.b),
           (read2->name.end == 0 ? NULL : read2->name.b));
 }
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
 
     if (cmd->seq1 != NULL) {
         // Align seq1 and seq2
-        align(cmd->seq1, cmd->seq2, NULL, NULL);
+        print_alignment(cmd->seq1, cmd->seq2, NULL, NULL);
     }
 
     // Align from files
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
     const char *db_file = cmdline_get_file2(cmd);
 
     if (query_file != NULL && db_file != NULL) {
-        align_from_query_and_db(query_file, db_file, &align, !cmd->interactive);
+        align_from_query_and_db(query_file, db_file, &scoring, sw, &print_alignment, !cmd->interactive);
     } else {
         fprintf(stderr, "Error: Both query and database files must be provided\n");
         fflush(stderr);
