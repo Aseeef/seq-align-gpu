@@ -438,21 +438,26 @@ void align_from_query_and_db(const char *query_path, const char *db_path, const 
         return;
     }
 
+    for (size_t i = 0 ; i < query_read.seq.end ; i++)
+      query_read.seq.b[i] = tolower(query_read.seq.b[i]);
+
     struct timespec time_start, time_stop;
     double total_time = 0;
     // Read database sequences and align each with the query
     read_t db_read;
     seq_read_alloc(&db_read);
 
-    while(seq_read(db_file, &db_read) > 0)
-    {
-        clock_gettime(CLOCK_REALTIME, &time_start);
-        smith_waterman_align(query_read.seq.b, db_read.seq.b, scoring, sw);
-        clock_gettime(CLOCK_REALTIME, &time_stop);
-        total_time += interval(time_start, time_stop);
-        print_alignment(query_read.seq.b, db_read.seq.b,
-                (query_read.name.end == 0 ? NULL : query_read.name.b),
-                (db_read.name.end == 0 ? NULL : db_read.name.b));
+    while(seq_read(db_file, &db_read) > 0) {
+      for (size_t i = 0 ; i < db_read.seq.end ; i++) {
+        db_read.seq.b[i] = tolower(db_read.seq.b[i]);
+      }
+      clock_gettime(CLOCK_REALTIME, &time_start);
+      smith_waterman_align(query_read.seq.b, db_read.seq.b, scoring, sw);
+      clock_gettime(CLOCK_REALTIME, &time_stop);
+      total_time += interval(time_start, time_stop);
+      print_alignment(query_read.seq.b, db_read.seq.b,
+              (query_read.name.end == 0 ? NULL : query_read.name.b),
+              (db_read.name.end == 0 ? NULL : db_read.name.b));
     }
 
     printf("Total time: %f\n", total_time);

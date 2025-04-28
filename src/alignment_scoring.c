@@ -89,25 +89,8 @@ static char _scoring_check_wildcards(const scoring_t *scoring, char a, char b,
  */
 void scoring_lookup(const scoring_t *scoring, char a, char b,
                     int *score, bool *is_match) {
-    if (!scoring->case_sensitive) {
-        a = tolower(a);
-        b = tolower(b);
-    }
-
-    //#ifdef SEQ_ALIGN_VERBOSE
-    //printf(" scoring_lookup(%c,%c)\n", a, b);
-    //#endif
-
-    *is_match = (a == b);
-
     // Look up in table
-    if (get_swap_bit(scoring, a, b)) {
-        *score = scoring->swap_scores[(size_t) a][(size_t) b];
-        return;
-    }
-
-    // Default score when no character pairs are set
-    *score = (*is_match ? scoring->match : scoring->mismatch);
+    *score = scoring->swap_scores[(size_t) a][(size_t) b];
 }
 
 /**
