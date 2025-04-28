@@ -87,28 +87,18 @@ static void alignment_fill_matrices(aligner_t *aligner)
       // (adding as ints would cause an integer overflow)
 
       // Update gap_a_scores[i][j] from position [i][j-1]
-      if(seq_i == len_i-1)
-      {
-        gap_a_scores[index]
+      gap_a_scores[index]
           = MAX4(match_scores[index_up] + gap_open_penalty,
                  gap_a_scores[index_up] + gap_extend_penalty,
                  gap_b_scores[index_up] + gap_open_penalty,
                  min);
-      }
-      else
-        gap_a_scores[index] = min;
 
       // Update gap_b_scores[i][j] from position [i-1][j]
-      if(seq_j == len_j-1)
-      {
-        gap_b_scores[index]
+      gap_b_scores[index]
           = MAX4(match_scores[index_left] + gap_open_penalty,
                  gap_a_scores[index_left] + gap_open_penalty,
                  gap_b_scores[index_left] + gap_extend_penalty,
                  min);
-      }
-      else
-        gap_b_scores[index] = min;
 
       index++;
       index_left++;
