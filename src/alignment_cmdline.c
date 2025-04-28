@@ -523,7 +523,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
             clock_gettime(CLOCK_REALTIME, &time_start);
 
-//#pragma omp parallel for schedule(static, 1)
+#pragma omp parallel for schedule(static, 1)
                 for (i = 0; i < BATCH_SIZE; i++) {
 
                     assert(aligners[i]->seq_b_fasta_batch != NULL);

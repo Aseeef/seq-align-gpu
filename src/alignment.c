@@ -81,7 +81,6 @@ void alignment_fill_matrices(aligner_t *aligner) {
     index = FULL_VECTOR_SIZE; // in curr scores
     index_right = (2 * FULL_VECTOR_SIZE); // in curr scores
 
-    size_t next_a_index;
     // int index = (h * width + w) * batch_size;
     for (seq_j = 0; seq_j < len_j; seq_j++) {
 
@@ -98,6 +97,7 @@ void alignment_fill_matrices(aligner_t *aligner) {
         index = FULL_VECTOR_SIZE; // Start calculating column 1
 
         for (seq_i = 0; seq_i < len_i; seq_i++) {
+            // Make sure to keep the entire table fetched at all times
             char const* prefetch_addr = (char const*)scoring->swap_scores;
             _mm_prefetch(prefetch_addr, _MM_HINT_T0);
             _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
