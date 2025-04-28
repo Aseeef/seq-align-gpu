@@ -13,13 +13,14 @@
 #include <stdbool.h>
 #include <x86intrin.h>
 #include <limits.h> // INT_MIN
+#include <stdalign.h>
 
-typedef int32_t score_t;
+typedef int16_t score_t;
 #define SCORE_MIN INT_MIN
 
 typedef struct
 {
-  int gap_open, gap_extend;
+  score_t gap_open, gap_extend;
 
   // If swap_score not set, should we use match/mismatch values?
   bool use_match_mismatch;
@@ -30,7 +31,7 @@ typedef struct
   // Array of characters that match to everything with the same penalty (i.e. 'N's)
   uint32_t swap_set[32];
   // The penalty or the reward for a match/mismatch between two characters.
-  score_t swap_scores[32][32];
+  alignas(32) int8_t swap_scores[32][32];  // swap scores int32_t for better simd
 
   int min_penalty, max_penalty; // min, max {match/mismatch,gapopen etc.}
 } scoring_t;
@@ -52,11 +53,9 @@ void scoring_init(scoring_t* scoring, int match, int mismatch,
 
 void scoring_add_mutation(scoring_t* scoring, char a, char b, int score);
 
-int letters_to_index(char c);
+char letters_to_index(char c);
 
-char index_to_letters(int c);
-
-__m256i scoring_lookup(const scoring_t *scoring, size_t batch_size, int a_index, int * b_indexes);
+char index_to_letters(char c);
 
 // Some scoring systems
 void scoring_system_default(scoring_t *scoring); // DNA/RNA default

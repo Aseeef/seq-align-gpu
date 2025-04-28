@@ -9,10 +9,6 @@
 #ifndef ALIGNMENT_CMDLINE_HEADER_SEEN
 #define ALIGNMENT_CMDLINE_HEADER_SEEN
 
-// request decent POSIX version
-#define _XOPEN_SOURCE 700
-#define _BSD_SOURCE
-
 #include <stdarg.h> // required for va_list
 #include <stdbool.h>
 #include "seq_file/seq_file.h"
@@ -26,8 +22,7 @@ typedef struct
   char *file_path1, *file_path2;
 
   // All values initially 0
-  bool case_sensitive;
-  int match, mismatch, gap_open, gap_extend;
+  score_t match, mismatch, gap_open, gap_extend;
 
   // SW specific
   unsigned int max_hits_per_alignment;
@@ -43,10 +38,11 @@ typedef struct
   // General output
   bool print_fasta, print_pretty, print_colour;
 
-  // Pair of sequences to align
-  const char *seq1, *seq2;
 } cmdline_t;
 
+char parse_entire_score_t(char *str, score_t *result);
+char parse_entire_short(char *str, short *result);
+char parse_entire_ushort(char *str, unsigned short *result);
 char parse_entire_int(char *str, int *result);
 char parse_entire_uint(char *str, unsigned int *result);
 
@@ -60,9 +56,7 @@ char* cmdline_get_file2(cmdline_t* cmd);
 
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t * scoring,
-                              void (align)(size_t batch_size, char * query, char ** db_batch,
-                                           score_t * query_indexes, score_t * db_seq_index_batch, size_t batch_max_len,
-                                      const char *query_name, const char **db_name),
+                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
                               bool use_zlib);
 
 #endif

@@ -3,12 +3,12 @@ LIBS_PATH=libs
 DEBUG=1
 
 ifdef DEBUG
-	OPT = -O0 -g -ggdb
+	OPT = -O3 -g -ggdb
 else
 	OPT = -O3
 endif
 
-CFLAGS = -Wall -Wextra -march=native -std=c11 $(OPT)
+CFLAGS = -Wall -Wextra -march=native -std=c11 -D_POSIX_C_SOURCE=200809L $(OPT)
 OBJFLAGS = -fPIC
 LINKFLAGS = -fopenmp -mavx2 -lalign -lstrbuf -lpthread -lz
 
