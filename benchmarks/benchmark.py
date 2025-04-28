@@ -9,7 +9,7 @@ import subprocess
 import re
 import os
 from tqdm import tqdm
-from statistics import mean
+from statistics import mean, stdev
 
 # Configuration
 executables_dir = '../executables'
@@ -34,7 +34,7 @@ def run_benchmark(executable_path, omp_threads=None):
         except subprocess.CalledProcessError as e:
             print(f"Error running {executable_path}: {e}")
 
-    return mean(times) if times else None
+    return (mean(times), stdev(times)) if len(times) > 1 else (None, None)
 
 def main():
     results = []
@@ -46,18 +46,18 @@ def main():
 
         if 'omp' in exe:
             for threads in ome_thresholds:
-                avg_time = run_benchmark(exe_path, omp_threads=threads)
+                avg_time, stddev_time = run_benchmark(exe_path, omp_threads=threads)
                 if avg_time is not None:
-                    results.append((exe, threads, avg_time))
+                    results.append((exe, threads, avg_time, stddev_time))
         else:
-            avg_time = run_benchmark(exe_path)
+            avg_time, stddev_time = run_benchmark(exe_path)
             if avg_time is not None:
-                results.append((exe, None, avg_time))
+                results.append((exe, None, avg_time, stddev_time))
 
     print("\nBenchmark Results:")
-    for exe, threads, avg_time in results:
+    for exe, threads, avg_time, stddev_time in results:
         thread_info = f" (OMP_NUM_THREADS={threads})" if threads is not None else ""
-        print(f"{exe}{thread_info}: Average Total Time = {avg_time:.6f} seconds")
+        print(f"{exe}{thread_info}: Average Total Time = {avg_time:.6f} seconds, Std Dev = {stddev_time:.6f} seconds")
 
 if __name__ == "__main__":
     main()
