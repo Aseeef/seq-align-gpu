@@ -343,7 +343,7 @@ static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
                : seq_dopen(fileno(stdin), false, false, 0);
 }
 
-#define BATCH_SIZE_FACTOR 64
+#define BATCH_SIZE_FACTOR 1024
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
@@ -461,7 +461,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
 
         read_status = seq_read(db_file, &db_read);
 
-        if (vec_elem_cnt == VECTOR_SIZE) {
+        if (vec_elem_cnt == VECTOR_SIZE || read_status == 0) {
             assert(query_seq_len != 0);
             assert(max_seq_len_in_vec != 0);
             assert(db_seq_vec_batch != NULL);
@@ -479,7 +479,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
                     db_seq_index_vec_batch,
                     query_seq_len,
                     max_seq_len_in_vec,
-                    VECTOR_SIZE,
+                    vec_elem_cnt,
                     scoring);
             } else {
                 aligner_update(
@@ -492,7 +492,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
                     db_seq_index_vec_batch,
                     query_seq_len,
                     max_seq_len_in_vec,
-                    VECTOR_SIZE,
+                    vec_elem_cnt,
                     scoring);
             }
 
@@ -506,7 +506,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
             if (batch_cnt == max_batch_size || read_status <= 0) {
 
                 clock_gettime(CLOCK_REALTIME, &time_start);
-#pragma omp parallel for schedule(static, 1)
+#pragma omp parallel for schedule(dynamic, 1)
                 for (i = 0; i < batch_cnt; i++) {
                     alignment_fill_matrices(aligners[i]);
                 }
@@ -531,7 +531,8 @@ void align_from_query_and_db(const char *query_path, const char *db_path, scorin
         }
     }
 
-    printf("Total time: %f\n", total_time);
+    printf("Total Time: %f\n", total_time);
+    printf("Total Entries: %lu\n", total_cnt);
 
     // Close files and free memory
     seq_close(query_file);

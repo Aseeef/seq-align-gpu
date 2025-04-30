@@ -18,26 +18,30 @@
 #include "alignment.h"
 #include "alignment_macros.h"
 
+const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
+
 /**
  * Looks up the score for aligning characters a and a batch of b's and determines if they match.
  *
  * @param scoring          Pointer to the scoring_t structure.
- * @param batch_size       The batch size
- * @param a                Query character in the alignment.
- * @param b_batch          DB batch of characters in the alignment
+ * @param a_index          Index of sequence a character
+ * @param b_indexes        DB indexes vector batch
  * @return                 The scores for aligning a and the batch of b's.
  */
-inline static __m256i scoring_lookup(const scoring_t *scoring, int8_t a_index, int8_t *b_indexes) {
+inline static __m256i scoring_lookup(const scoring_t *scoring, int8_t a_index, const int8_t *b_indexes) {
     // base address (the row) of the swap_scores for a_index
     const int8_t *swap_scores = scoring->swap_scores[a_index];
     alignas(32) int16_t indexes[16];
-    for (int32_t i = 0; i < 16; i++) {
+    // tried loop unrolling here but doesn't really help
+    // (-O3 probably auto unrolls)
+    // also considered using avx instructions for lookup
+    // but no direct way to do this. This is likely as
+    // good as it gets
+    for (int32_t i = 0; i < 16; i ++) {
         indexes[i] = (int16_t) swap_scores[b_indexes[i]];
     }
     return _mm256_load_si256((__m256i *) indexes);
 }
-
-const size_t FULL_VECTOR_SIZE = 32 / sizeof(score_t);
 
 // Fill in traceback matrix for an ENTIRE BATCH
 void alignment_fill_matrices(aligner_t *aligner) {
