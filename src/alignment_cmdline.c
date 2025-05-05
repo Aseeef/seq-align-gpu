@@ -460,7 +460,7 @@ void align_from_query_and_db(const char *query_path, const char *db_path, const 
               (db_read.name.end == 0 ? NULL : db_read.name.b));
     }
 
-    printf("Total time: %f\n", total_time);
+    printf("Total Time: %f\n", total_time);
 
     // Close files and free memory
     seq_close(query_file);
