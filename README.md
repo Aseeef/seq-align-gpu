@@ -36,6 +36,7 @@ bin/smith_waterman --substitution_matrix scoring/PAM250.txt --printfasta --files
 
 * Designed for protein sequences only
 * Assumes amino acid alphabet maps to 32-character substitution matrix
+* Some intermediate milestones are saved in project branches.
 * See Final Report.pdf for full technical details and benchmark results
 
 ## Author
