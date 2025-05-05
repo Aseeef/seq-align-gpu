@@ -67,7 +67,7 @@ void scoring_add_mutation(scoring_t *scoring, char a, char b, int score) {
     scoring->max_penalty = MAX2(scoring->max_penalty, score);
 }
 
-char letters_to_index(char c) {
+int8_t letters_to_index(char c) {
     if (c >= 97 && c < 123) {
         return c - 96;
     } else if (c >= 65 && c < 91) {
@@ -80,7 +80,7 @@ char letters_to_index(char c) {
     }
 }
 
-char index_to_letters(char c) {
+char index_to_letters(int8_t c) {
     if (c >= 1 && c < 27) {
         return c + 64;
     } else if (c == 31) {

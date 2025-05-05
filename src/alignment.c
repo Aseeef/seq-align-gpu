@@ -48,6 +48,8 @@ void alignment_fill_matrices(aligner_t *aligner) {
     score_t *curr_match_scores = aligner->curr_match_scores;
     score_t *curr_gap_a_scores = aligner->curr_gap_a_scores;
     score_t *curr_gap_b_scores = aligner->curr_gap_b_scores;
+    int8_t * seq_a_indices = aligner->seq_a_indexes;
+    int8_t * seq_b_indices = aligner->seq_b_batch_indexes;
     const scoring_t *scoring = aligner->scoring;
     size_t score_width = aligner->score_width;
     size_t score_height = aligner->score_height;
@@ -100,25 +102,11 @@ void alignment_fill_matrices(aligner_t *aligner) {
 
         for (seq_i = 0; seq_i < len_i; seq_i++) {
 
-            // Make sure to keep the entire table fetched at all times by prefetching
-            // everytime the inner loop finishes
-            char const* prefetch_addr = (char const*)scoring->swap_scores;
-            _mm_prefetch(prefetch_addr, _MM_HINT_T0);
-            _mm_prefetch(prefetch_addr + 64, _MM_HINT_T0);
-            _mm_prefetch(prefetch_addr + 128, _MM_HINT_T0);
-            _mm_prefetch(prefetch_addr + 192, _MM_HINT_T0);
 
             // substitution penalty
-            __m256i substitution_penalty = scoring_lookup(scoring, aligner->seq_a_indexes[seq_i],
-                                                          aligner->seq_b_batch_indexes + (seq_j * FULL_VECTOR_SIZE));
+            __m256i substitution_penalty = scoring_lookup(scoring, seq_a_indices[seq_i],
+                                                          seq_b_indices + (seq_j * FULL_VECTOR_SIZE));
 
-            // Prefetch gap_a_scores, gap_b_scores, match_scores at the upcoming index
-            char const *gap_a_scores_ptr = (char const *) (curr_gap_a_scores + index_right);
-            char const *gap_b_scores_ptr = (char const *) (curr_gap_b_scores + index_right);
-            char const *curr_match_scores_ptr = (char const *) (curr_match_scores + index_right);
-            _mm_prefetch(gap_a_scores_ptr, _MM_HINT_T0);
-            _mm_prefetch(gap_b_scores_ptr, _MM_HINT_T0);
-            _mm_prefetch(curr_match_scores_ptr, _MM_HINT_T0);
 
             // Currently index has the values of the table from the previous iteration of seq_j (i.e. the row)
             // so we gotta cache em before its overwritten because we need this
@@ -142,8 +130,7 @@ void alignment_fill_matrices(aligner_t *aligner) {
 
             // update best score
             // equal to: max_scores_vec[i] = (match_score[i] > max_scores_vec[i]) ? match_score[i] : max_scores_vec[i];
-            __m256i mask = _mm256_cmpgt_epi16(match_score_curr, max_scores_vec);
-            max_scores_vec = _mm256_blendv_epi8(max_scores_vec, match_score_curr, mask);
+            max_scores_vec = _mm256_max_epi16(match_score_curr, max_scores_vec);
 
             // Update gap_a_scores[i][j]
             //          gap_a_scores[index]

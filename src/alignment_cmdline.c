@@ -343,7 +343,7 @@ static seq_file_t *open_seq_file(const char *path, bool use_zlib) {
                : seq_dopen(fileno(stdin), false, false, 0);
 }
 
-#define BATCH_SIZE_FACTOR 1024
+#define BATCH_SIZE_FACTOR 256
 
 void align_from_query_and_db(const char *query_path, const char *db_path, scoring_t *scoring,
                              void (print_alignment)(aligner_t * aligner, size_t total_cnt),
