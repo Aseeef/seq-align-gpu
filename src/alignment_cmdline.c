@@ -128,8 +128,6 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
             "    --files <f1> <f2>    Read one sequence from each file to align at one time\n"
             "    --stdin              Read from STDIN (same as '--file -')\n"
             "\n"
-            "    --case_sensitive     Use case sensitive character comparison [default: off]\n"
-            "\n"
             "    --match <score>      [default: %i]\n"
             "    --mismatch <score>   [default: %i]\n"
             "    --gapopen <score>    [default: %i]\n"
@@ -165,7 +163,7 @@ static void print_usage(enum SeqAlignCmdType cmd_type, score_t defaults[4],
         "  * Scoring files should be matrices, with entries separated by a single\n"
         "    character or whitespace. See files in the 'scores' directory for examples.\n"
         "\n"
-        "  turner.isaac@gmail.com  (compiled: %s %s)\n", __DATE__, __TIME__);
+        "  (compiled: %s %s)\n", __DATE__, __TIME__);
 
     exit(EXIT_FAILURE);
 }
@@ -206,10 +204,7 @@ cmdline_t *cmdline_new(int argc, char **argv, scoring_t *scoring,
 
     for (argi = 1; argi < argc; argi++) {
         if (argv[argi][0] == '-') {
-            if (strcasecmp(argv[argi], "--case_sensitive") == 0) {
-                // Already dealt with
-                //case_sensitive = true;
-            } else if (strcasecmp(argv[argi], "--printseq") == 0) {
+            if (strcasecmp(argv[argi], "--printseq") == 0) {
                 if (cmd_type != SEQ_ALIGN_SW_CMD)
                     usage("--printseq only valid with Smith-Waterman");
                 cmd->print_seq = true;
