@@ -14,7 +14,7 @@ from statistics import mean, stdev
 # Configuration
 executables_dir = '../executables'
 command_args = ['--substitution_matrix', '../scoring/PAM250.txt', '--files', '../database/query.fasta', '../database/database.fasta']
-ome_thresholds = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+ome_thresholds = [1, 2, 4, 8, 16, 32]
 repeats = 6
 
 def run_benchmark(executable_path, omp_threads=None):
@@ -26,7 +26,7 @@ def run_benchmark(executable_path, omp_threads=None):
     for _ in tqdm(range(repeats), desc=executable_path.split("/")[-1] + ("" if omp_threads is None else f" (OMP_NUM_THREADS={omp_threads})")):
         try:
             result = subprocess.run([executable_path] + command_args, capture_output=True, text=True, env=env, check=True)
-            match = re.search(r'Total time: ([0-9]*\.?[0-9]+)', result.stdout)
+            match = re.search(r'Total Time: ([0-9]*\.?[0-9]+)', result.stdout)
             if match:
                 times.append(float(match.group(1)))
             else:
@@ -55,9 +55,11 @@ def main():
                 results.append((exe, None, avg_time, stddev_time))
 
     print("\nBenchmark Results:")
+    print()
+    print("Name, Average Total Time (sec), Std (s)")
     for exe, threads, avg_time, stddev_time in results:
         thread_info = f" (OMP_NUM_THREADS={threads})" if threads is not None else ""
-        print(f"{exe}{thread_info}: Average Total Time = {avg_time:.6f} seconds, Std Dev = {stddev_time:.6f} seconds")
+        print(f"{exe}{thread_info}, {avg_time:.6f}, {stddev_time:.6f}")
 
 if __name__ == "__main__":
     main()

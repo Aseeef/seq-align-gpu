@@ -53,9 +53,9 @@ void scoring_init(scoring_t* scoring, int match, int mismatch,
 
 void scoring_add_mutation(scoring_t* scoring, char a, char b, int score);
 
-char letters_to_index(char c);
+int8_t letters_to_index(char c);
 
-char index_to_letters(char c);
+char index_to_letters(int8_t c);
 
 // Some scoring systems
 void scoring_system_default(scoring_t *scoring); // DNA/RNA default
